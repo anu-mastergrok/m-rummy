@@ -7,6 +7,10 @@ Official references:
 - [Hostinger Node.js hosting options](https://www.hostinger.com/support/node-js-hosting-options-at-hostinger/)
 - [Rummy gameplay reference supplied for this project](https://www.rummycircle.com/how-to-play-rummy/amp-multiplayer-rummy.html)
 
+## Automatic deployment from GitHub
+
+Use [GITHUB_ACTIONS.md](GITHUB_ACTIONS.md) to configure SSH-based deployment on this Premium plan. The existing **Check and test** workflow can deploy tested `main` commits automatically or on a manual run. Add the four Hostinger secrets and required repository variables, then enable deployment. Existing config, accounts, and points are preserved with a private backup; active rounds block an update. The manual upload instructions below remain available.
+
 ## 1. Prepare a dedicated site
 
 In hPanel, select your Premium hosting and create or select the domain/subdomain you want to use, such as `rummy.yourdomain.com`. Use a separate subdomain rather than replacing an existing WordPress or business website. Wait for its DNS to resolve, activate SSL, and enable Force HTTPS.

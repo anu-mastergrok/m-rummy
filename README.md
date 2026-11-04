@@ -27,6 +27,8 @@ Follow **[docs/HOSTINGER.md](docs/HOSTINGER.md)**. Use a dedicated domain or sub
 
 The GitHub Actions **Check and test** workflow also produces a ready-to-extract **m-rummy-hostinger** artifact containing an upload ZIP. You can build it locally with `python3 tools/package.py`.
 
+For automatic deployments, follow **[docs/GITHUB_ACTIONS.md](docs/GITHUB_ACTIONS.md)**. After you add the Hostinger SSH secrets and enable the repository variable, tested pushes to `main` deploy through SSH. Deployment preserves private configuration and player data, backs up changes, refuses active rounds, and checks the HTTPS API. It is disabled until configured.
+
 ## Run locally
 
 Install PHP 8.2 or later. Then, from the repository root:

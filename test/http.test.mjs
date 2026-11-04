@@ -42,6 +42,15 @@ test('HTTP multiplayer, isolation, CSRF, competing moves, reconnect, and durable
     return { status: response.status, body: result };
   }
   const a = await user(), b = await user(), outsider = await user();
+  // A deploy lock gives a retryable maintenance response; releasing it keeps
+  // the original session intact instead of initializing replacement state.
+  const lockOwner = spawn(process.env.PHP_BIN || 'php', ['-r', '$f=fopen(".deploy.lock","c");flock($f,LOCK_EX);echo "locked\\n";fflush(STDOUT);fgets(STDIN);flock($f,LOCK_UN);'], { stdio: ['pipe', 'pipe', 'ignore'] });
+  t.after(() => { if (lockOwner.exitCode === null) lockOwner.kill(); });
+  await new Promise((resolve, reject) => { lockOwner.stdout.once('data', resolve); lockOwner.once('error', reject); });
+  const duringDeploy = await fetch(`${base}/api/session`, { headers: { Cookie: a.cookie } });
+  assert.equal(duringDeploy.status, 503); assert.equal(duringDeploy.headers.get('retry-after'), '10');
+  lockOwner.stdin.end('\n'); await new Promise(r => lockOwner.once('exit', r));
+  assert.equal((await request(a, 'session')).body.id, a.id);
   assert.equal((await request(a, 'create', { name: 'Sunil' })).status, 401);
   const guestCookie = a.cookie;
   const signup = await request(a, 'register', { username: 'sunil_test', name: 'Sunil', password: 'password-for-test-only' });
