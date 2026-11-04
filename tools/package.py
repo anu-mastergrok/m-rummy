@@ -14,4 +14,5 @@ with ZipFile(target, 'w', ZIP_DEFLATED) as archive:
             archive.write(path, 'server/' + path.name)
     archive.write(root / 'docs' / 'HOSTINGER.md', 'HOSTINGER.md')
     archive.write(root / 'docs' / 'PROFILES.md', 'PROFILES.md')
+    archive.write(root / 'docs' / 'GITHUB_ACTIONS.md', 'GITHUB_ACTIONS.md')
 print(target)

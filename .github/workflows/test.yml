@@ -2,6 +2,7 @@ name: Check and test
 on:
   push:
   pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -19,7 +20,74 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run package
+      - run: python3 tools/build-release.py
       - uses: actions/upload-artifact@v4
         with:
           name: m-rummy-hostinger
           path: dist/m-rummy-hostinger.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m-rummy-ssh-release
+          path: dist/m-rummy-release.tar.gz
+          retention-days: 7
+  deploy:
+    name: Deploy to Hostinger Premium
+    needs: test
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      vars.HOSTINGER_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: hostinger-production
+    concurrency:
+      group: hostinger-production
+      cancel-in-progress: false
+    env:
+      HOSTINGER_SSH_HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
+      HOSTINGER_SSH_USER: ${{ secrets.HOSTINGER_SSH_USER }}
+      HOSTINGER_SSH_PORT: ${{ vars.HOSTINGER_SSH_PORT || '65002' }}
+      HOSTINGER_DEPLOY_PATH: ${{ vars.HOSTINGER_DEPLOY_PATH }}
+      HOSTINGER_APP_URL: ${{ vars.HOSTINGER_APP_URL }}
+      HOSTINGER_PHP_BINARY: ${{ vars.HOSTINGER_PHP_BINARY || 'php' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: m-rummy-ssh-release
+          path: dist
+      - name: Confirm this is still the latest main commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          test "$latest" = "$GITHUB_SHA" || { echo 'A newer main commit exists. Deploy the latest successful run.' >&2; exit 1; }
+      - name: Prepare private SSH identity and verified host keys
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.HOSTINGER_SSH_KNOWN_HOSTS }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          directory = Path(os.environ['RUNNER_TEMP']) / 'm-rummy-ssh'
+          directory.mkdir(mode=0o700, exist_ok=True)
+          for name, variable in [('id_ed25519', 'SSH_PRIVATE_KEY'), ('known_hosts', 'SSH_KNOWN_HOSTS')]:
+              value = os.environ.get(variable, '').strip()
+              if not value:
+                  raise SystemExit(f'Missing required GitHub secret: {variable}')
+              path = directory / name
+              path.write_text(value.replace('\r\n', '\n') + '\n')
+              path.chmod(0o600)
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write(f'HOSTINGER_SSH_KEY_FILE={directory / "id_ed25519"}\n')
+              output.write(f'HOSTINGER_KNOWN_HOSTS_FILE={directory / "known_hosts"}\n')
+          PY
+          ssh-keygen -y -P '' -f "$RUNNER_TEMP/m-rummy-ssh/id_ed25519" > /dev/null
+      - name: Install tested code and check the HTTPS API
+        run: bash tools/deploy-hostinger.sh
+      - name: Remove runner SSH identity
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/m-rummy-ssh"
