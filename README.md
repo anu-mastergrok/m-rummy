@@ -4,6 +4,9 @@ A private, play-for-fun 13-card Indian rummy app for friends and family. Built f
 
 ## What you can do
 
+- Sign up with a username and password and receive **10,000 play points once**.
+- Keep a permanent player profile with a saved balance, wins, played rounds, and paginated points history.
+- Earn **100 play points per registered human opponent beaten** (configurable); losses never deduct profile points, and bot-only practice earns none.
 - Create an invite-only table with a random 12-character code and optional password.
 - Play with 2–6 people; add practice bots to empty seats between rounds.
 - Share a room link, chat at the table, and return to your seat after refreshing.
@@ -66,7 +69,13 @@ State is saved as JSON outside the web root. An exclusive `flock` on a separate 
 
 Timers advance when a seated player polls or makes an API request. When everyone closes the app, no PHP process stays running. The next connected request resolves the overdue turn once and starts the next player's timer. There is no background cron requirement.
 
-Sessions last 30 days and rely on the browser's HttpOnly cookie. Use the same browser to reconnect; clearing its cookies creates a different player. There is no email login, cross-device account recovery, or room-owner recovery if the host loses their cookie. Tables inactive for 24 hours expire on a subsequent API request. A lobby host can leave and ownership transfers to another human player. Players leave active tables after the round; dropping allows watching until it finishes.
+Sessions last 30 days and use an HttpOnly cookie. Signing in with the same username/password on another browser or device restores the same profile and any existing seat. Signing out expires the current device's session and leaves account data intact. Profiles, balances, and points history do not expire when sessions or rooms expire. Keep your username/password safe: email verification and self-service password recovery are not included. Legacy guests can finish existing rounds and create an account to retain their seat; new room creation/joining requires an account. Tables inactive for 24 hours expire on a subsequent API request. A lobby host can leave and ownership transfers to another human player. Players leave active tables after the round; dropping allows watching until it finishes.
+
+## Profiles, rewards, and upgrading an existing installation
+
+See **[docs/PROFILES.md](docs/PROFILES.md)** for the exact points rules, authentication behavior, data upgrade, and backup requirements. No SQL migrations or database setup are needed. The first API request automatically backs up and upgrades the original guest-only JSON save to schema version 2 without deleting existing games. Deploy the complete matching public/server release, including the updated `.htaccess` and `server/accounts.php`.
+
+The welcome bonus is recorded once per account. A completed round credits its reward and records stats under the same exclusive lock as the winning move/timeout. Unique round IDs and immutable point-event IDs prevent a repeated poll, retry, or rematch from paying the same win twice. Only registered humans seated at the start of the round count as earning opponents. A last-player-standing win after drops earns the same reward. Practice bots contribute no rewards; human-versus-bot-only rounds do not update profile wins or played-round stats. Points have no cash value, cannot be purchased, transferred, or withdrawn, and are separate from lower-is-better round penalty scores.
 
 ## Rules used here
 
@@ -95,4 +104,4 @@ Do not enable HTML/page caching or CDN caching for `/api/*`. The included servic
 
 Open the same hosted HTTPS link in Android Chrome or iPhone/iPad Safari. Touch-select cards and swipe the hand sideways to reach additional groups. Portrait and landscape layouts are supported, including safe-area spacing and form text sized to prevent Safari's input zoom. The footer has **Add to your home screen** instructions. Browser menus and installation wording vary by OS/browser version; no app-store build is necessary.
 
-Keep using the same browser or home-screen app for an existing seat: mobile installations can have their own cookie storage. After locking your phone, changing networks, or backgrounding the page, return to it to reconnect. Server timers may still expire while you're away. This repository was tested with desktop Chrome and narrow phone/tablet browser frames; physical Android and iOS devices still need a smoke test after hosting.
+Sign in with the same account in your browser or home-screen app to restore your profile and seat: mobile installations may use separate cookie storage. After locking your phone, changing networks, or backgrounding the page, return to it to reconnect. Server timers may still expire while you're away. This repository was tested with desktop Chrome and narrow phone/tablet browser frames; physical Android and iOS devices still need a smoke test after hosting.

@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-require_once __DIR__ . '/game.php';
+require_once __DIR__ . '/accounts.php';
 
 final class RummyApiError extends RuntimeException {
     public function __construct(string $message, public int $status = 400, public ?array $state = null) { parent::__construct($message); }
@@ -13,6 +13,23 @@ function rummy_limit(array &$store, string $key, int $max, int $period = 60000):
 function rummy_current(array $store, string $id): ?string {
     foreach ($store['rooms'] as $code => $room) if (rummy_find($room, $id) !== null) return (string)$code;
     return null;
+}
+function rummy_session_cookie(string $token, array $session, array $config): void {
+    setcookie('mr_session', $token, ['expires' => (int)($session['expires'] / 1000), 'path' => '/', 'secure' => $config['secure_cookies'], 'httponly' => true, 'samesite' => 'Strict']);
+}
+function rummy_session_view(array $store, array $session): array {
+    return ['id' => $session['id'], 'csrf' => $session['csrf'], 'room' => rummy_current($store, $session['id']),
+        'account' => !empty($session['accountId']) ? rummy_profile($store, $session['id']) : null];
+}
+function rummy_rotate_session(array &$store, string $oldToken, string $id, bool $signedIn, array $config): array {
+    unset($store['sessions'][$oldToken]);
+    $token = bin2hex(random_bytes(32));
+    $session = ['id' => $id, 'csrf' => bin2hex(random_bytes(24)), 'expires' => rummy_now() + 30 * 86400000, 'accountId' => $signedIn ? $id : null];
+    $store['sessions'][$token] = $session; rummy_session_cookie($token, $session, $config);
+    return rummy_session_view($store, $session);
+}
+function rummy_room_view(array $store, array $room, string $id): array {
+    return array_merge(rummy_public($room, $id), ['account' => rummy_profile($store, $id)]);
 }
 function rummy_handle(array &$store, array $config, string $route, string $method, array $input): array {
     $now = rummy_now(); $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
@@ -27,9 +44,9 @@ function rummy_handle(array &$store, array $config, string $route, string $metho
             $token = bin2hex(random_bytes(32));
             $session = ['id' => bin2hex(random_bytes(16)), 'csrf' => bin2hex(random_bytes(24)), 'expires' => $now + 30 * 86400000];
             $store['sessions'][$token] = $session;
-            setcookie('mr_session', $token, ['expires' => (int)($session['expires'] / 1000), 'path' => '/', 'secure' => $config['secure_cookies'], 'httponly' => true, 'samesite' => 'Strict']);
+            rummy_session_cookie($token, $session, $config);
         }
-        return ['id' => $session['id'], 'csrf' => $session['csrf'], 'room' => rummy_current($store, $session['id'])];
+        return rummy_session_view($store, $session);
     }
     if (!$session) throw new RummyApiError('Your session expired. Reload this page.', 401);
     $id = $session['id']; rummy_limit($store, "user:$id", 180);
@@ -39,15 +56,43 @@ function rummy_handle(array &$store, array $config, string $route, string $metho
         if (($origin && $origin !== $expected) || !hash_equals($session['csrf'], $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) throw new RummyApiError('Request verification failed. Reload the page.', 403);
         rummy_limit($store, "actions:$id", 60);
     }
+    if (in_array($route, ['register', 'login', 'logout'], true)) {
+        if ($method !== 'POST') throw new RummyApiError('Method not allowed.', 405);
+        rummy_limit($store, 'auth:' . hash('sha256', $ip), 20);
+        if ($route === 'logout') return rummy_rotate_session($store, $token, bin2hex(random_bytes(16)), false, $config);
+        rummy_require(empty($session['accountId']), 'Sign out before switching accounts.');
+        if ($route === 'register') {
+            rummy_limit($store, 'signup:' . hash('sha256', $ip), 30, 3600000);
+            rummy_register($store, $id, $input['username'] ?? null, $input['name'] ?? null, $input['password'] ?? null);
+            foreach ($store['rooms'] as &$existingRoom) {
+                $seat = rummy_find($existingRoom, $id);
+                if ($seat !== null) {
+                    $existingRoom['players'][$seat]['name'] = $store['users'][$id]['name'];
+                    rummy_log($existingRoom, $store['users'][$id]['name'] . ' saved their player profile.');
+                }
+            } unset($existingRoom);
+            return rummy_rotate_session($store, $token, $id, true, $config);
+        }
+        rummy_require(rummy_current($store, $id) === null, 'Leave your guest table first, or create an account to keep that seat.');
+        $accountId = rummy_verify_login($store, $input['username'] ?? null, $input['password'] ?? null);
+        return rummy_rotate_session($store, $token, $accountId, true, $config);
+    }
+    if ($route === 'profile' && $method === 'GET') {
+        if (empty($session['accountId'])) throw new RummyApiError('Sign in to view your profile.', 401);
+        $offset = filter_var($_GET['offset'] ?? 0, FILTER_VALIDATE_INT);
+        rummy_require($offset !== false && $offset >= 0 && $offset <= 1000000, 'Invalid history page.');
+        return rummy_profile($store, $id, $offset);
+    }
+    if (in_array($route, ['create', 'join'], true) && empty($session['accountId'])) throw new RummyApiError('Create an account or sign in to play.', 401);
     if ($route === 'create' && $method === 'POST') {
         $key = $config['create_room_key'];
         if ($key !== '' && (!is_string($input['accessKey'] ?? null) || !hash_equals($key, $input['accessKey']))) throw new RummyApiError('Enter the host access code to create a table.', 403);
         rummy_require(rummy_current($store, $id) === null, 'You already have a table. Return to it or leave it first.');
         rummy_require(count($store['rooms']) < $config['max_rooms'], 'Server is full. Please try later.');
-        $room = rummy_create($id, $input['name'] ?? null, $input['password'] ?? '');
+        $room = rummy_create($id, $store['users'][$id]['name'], $input['password'] ?? '');
         rummy_log($room, $room['players'][0]['name'] . ' opened the table.');
         $store['rooms'][$room['code']] = $room;
-        return rummy_public($room, $id);
+        return rummy_room_view($store, $room, $id);
     }
     $code = $method === 'GET' ? ($_GET['code'] ?? '') : ($input['code'] ?? '');
     $code = is_string($code) ? strtoupper($code) : '';
@@ -57,23 +102,24 @@ function rummy_handle(array &$store, array $config, string $route, string $metho
         rummy_limit($store, "join:$id", 10);
         $current = rummy_current($store, $id);
         rummy_require($current === null || $current === $code, 'Leave your current table before joining another.');
-        rummy_join($room, $id, $input['name'] ?? null, $input['password'] ?? '');
-        return rummy_public($room, $id);
+        rummy_join($room, $id, $store['users'][$id]['name'], $input['password'] ?? '');
+        return rummy_room_view($store, $room, $id);
     }
     rummy_require(rummy_find($room, $id) !== null, 'Join this room first.');
     // Every connected player's poll advances an expired turn. Only one turn
     // advances per request; the exclusive storage lock prevents double moves.
     rummy_tick($room);
-    if ($route === 'room' && $method === 'GET') return rummy_public($room, $id);
+    rummy_settle($store, $room);
+    if ($route === 'room' && $method === 'GET') return rummy_room_view($store, $room, $id);
     if ($route !== 'action' || $method !== 'POST') throw new RummyApiError('Not found.', 404);
     $action = $input['action'] ?? '';
     if ($action === 'arrange') {
         rummy_limit($store, "arrange:$id", 12);
         return rummy_analyze($room['players'][rummy_find($room, $id)]['hand'], $room['wildRank']);
     }
-    if (($input['version'] ?? null) !== $room['version']) throw new RummyApiError('The table changed. Your hand has been refreshed; try again.', 409, rummy_public($room, $id));
+    if (($input['version'] ?? null) !== $room['version']) throw new RummyApiError('The table changed. Your hand has been refreshed; try again.', 409, rummy_room_view($store, $room, $id));
     switch ($action) {
-        case 'start': rummy_start($room, $id); break;
+        case 'start': rummy_start($room, $id, array_keys($store['users']), (int)($config['win_points_per_opponent'] ?? 100)); break;
         case 'addBot': rummy_bot($room, $id); break;
         case 'removeBot':
             rummy_require($room['host'] === $id && $room['status'] !== 'playing', 'Only the host can remove bots between rounds.');
@@ -98,14 +144,15 @@ function rummy_handle(array &$store, array $config, string $route, string $metho
             $room['messages'] = array_slice($room['messages'], -40); $room['version']++; $room['updatedAt'] = $now; break;
         default: throw new RummyApiError('Unknown table action.');
     }
-    return rummy_public($room, $id);
+    rummy_settle($store, $room);
+    return rummy_room_view($store, $room, $id);
 }
 
 function rummy_api(): void {
     ini_set('display_errors', '0');
     header('Content-Type: application/json; charset=utf-8'); header('Cache-Control: no-store');
     header('X-Content-Type-Options: nosniff'); header('Referrer-Policy: no-referrer');
-    $config = ['app_origin' => '', 'secure_cookies' => true, 'data_dir' => dirname(__DIR__) . '/data', 'create_room_key' => '', 'max_rooms' => 100];
+    $config = ['app_origin' => '', 'secure_cookies' => true, 'data_dir' => dirname(__DIR__) . '/data', 'create_room_key' => '', 'max_rooms' => 100, 'win_points_per_opponent' => 100];
     if (is_file(__DIR__ . '/config.php')) $config = array_replace($config, require __DIR__ . '/config.php');
     if (getenv('RUMMY_TEST_DATA_DIR')) $config['data_dir'] = getenv('RUMMY_TEST_DATA_DIR');
     // Explicit dev flag is used only by the local CLI server, never hPanel.
@@ -114,7 +161,8 @@ function rummy_api(): void {
     try {
         $method = $_SERVER['REQUEST_METHOD']; $route = $_GET['route'] ?? '';
         if (!in_array($method, ['GET', 'POST'], true)) throw new RummyApiError('Method not allowed.', 405);
-        if (!is_string($route) || !in_array($route, ['session', 'room', 'create', 'join', 'action'], true)) throw new RummyApiError('Not found.', 404);
+        if (!is_string($route) || !in_array($route, ['session', 'room', 'create', 'join', 'action', 'register', 'login', 'logout', 'profile'], true)) throw new RummyApiError('Not found.', 404);
+        if (!is_int($config['win_points_per_opponent']) || $config['win_points_per_opponent'] < 1 || $config['win_points_per_opponent'] > 10000) throw new LogicException('Invalid win points configuration.');
         $input = [];
         if ($method === 'POST') {
             if (!str_starts_with($_SERVER['CONTENT_TYPE'] ?? '', 'application/json')) throw new RummyApiError('Send JSON requests.', 415);
@@ -134,6 +182,11 @@ function rummy_api(): void {
         $path = $dir . '/state.json';
         $store = is_file($path) ? json_decode(file_get_contents($path), true, 512, JSON_THROW_ON_ERROR) : ['sessions' => [], 'rooms' => [], 'limits' => [], 'cleanedAt' => 0];
         if (!is_array($store) || !isset($store['sessions'], $store['rooms'], $store['limits'])) throw new LogicException('Invalid saved state. Restore a backup.');
+        if (is_file($path) && ($store['schemaVersion'] ?? 1) < RUMMY_SCHEMA_VERSION) {
+            $backup = $dir . '/state.v1.' . gmdate('Ymd-His') . '.' . bin2hex(random_bytes(3)) . '.backup.json';
+            if (!copy($path, $backup) || !chmod($backup, 0600)) throw new LogicException('Cannot back up existing data for upgrade.');
+        }
+        $store = rummy_migrate($store);
         if (rummy_now() - ($store['cleanedAt'] ?? 0) > 60000) {
             $time = rummy_now();
             foreach ($store['sessions'] as $key => $s) if ($s['expires'] < $time) unset($store['sessions'][$key]);
@@ -142,13 +195,13 @@ function rummy_api(): void {
             $store['cleanedAt'] = $time;
         }
         // Keep throttles even on failures, but roll back partially applied moves.
-        $roomsBefore = $store['rooms'];
+        $before = $store;
         try { $result = rummy_handle($store, $config, $route, $method, $input); }
         catch (RummyApiError $e) {
-            if ($e->status !== 409) $store['rooms'] = $roomsBefore;
+            if ($e->status !== 409) $store = array_replace($before, ['limits' => $store['limits']]);
             $status = $e->status; $result = ['error' => $e->getMessage()];
             if ($e->state !== null) $result['state'] = $e->state;
-        } catch (RuntimeException $e) { $store['rooms'] = $roomsBefore; $status = 400; $result = ['error' => $e->getMessage()]; }
+        } catch (RuntimeException $e) { $store = array_replace($before, ['limits' => $store['limits']]); $status = 400; $result = ['error' => $e->getMessage()]; }
         $encoded = json_encode($store, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
         $temp = $dir . '/state.tmp';
         if (file_put_contents($temp, $encoded) !== strlen($encoded) || !chmod($temp, 0600) || !rename($temp, $path)) throw new LogicException('Cannot save game state.');

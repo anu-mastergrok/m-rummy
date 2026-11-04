@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { spawn, execFileSync } from 'node:child_process';
+import { mkdtemp, rm, readFile, writeFile, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import net from 'node:net';
@@ -36,15 +36,28 @@ test('HTTP multiplayer, isolation, CSRF, competing moves, reconnect, and durable
   }
   async function request(user, route, input, headers = {}) {
     const response = await fetch(`${base}/api/${route}`, { method: input === undefined ? 'GET' : 'POST', headers: { Cookie: user?.cookie || '', ...(input !== undefined ? { 'Content-Type': 'application/json', 'X-CSRF-Token': user?.csrf || '', Origin: base } : {}), ...headers }, body: input === undefined ? undefined : JSON.stringify(input) });
-    return { status: response.status, body: await response.json() };
+    const result = await response.json();
+    const cookie = response.headers.get('set-cookie'); if (cookie && user) user.cookie = cookie.split(';')[0];
+    if (response.ok && ['register', 'login', 'logout', 'session'].includes(route) && user) Object.assign(user, result);
+    return { status: response.status, body: result };
   }
   const a = await user(), b = await user(), outsider = await user();
+  assert.equal((await request(a, 'create', { name: 'Sunil' })).status, 401);
+  const guestCookie = a.cookie;
+  const signup = await request(a, 'register', { username: 'sunil_test', name: 'Sunil', password: 'password-for-test-only' });
+  assert.equal(signup.status, 200); assert.equal(signup.body.account.points, 10000); assert.notEqual(a.cookie, guestCookie);
+  assert.equal((await request({ ...a, cookie: guestCookie }, 'session')).body.account, null);
+  assert.equal((await request(b, 'register', { username: 'friend_test', name: 'Friend', password: 'password-for-test-only' })).status, 200);
+  assert.equal((await request(outsider, 'register', { username: 'SUNIL_TEST', name: 'Duplicate', password: 'password-for-test-only' })).status, 400);
+  assert.equal((await request(outsider, 'profile')).status, 401);
   const created = await request(a, 'create', { name: 'Sunil', password: 'friends' }); assert.equal(created.status, 200);
   const code = created.body.code;
   assert.equal((await request(b, 'join', { code, name: 'Friend', password: 'wrong' })).status, 400);
   const joined = await request(b, 'join', { code, name: 'Friend', password: 'friends' }); assert.equal(joined.status, 200);
   const blocked = await request(outsider, `room?code=${code}`); assert.equal(blocked.status, 400); assert.equal(blocked.body.hand, undefined);
   const state = (await request(a, `room?code=${code}`)).body;
+  assert.equal((await request(a, 'action', { code, action: 'award', amount: 1000000, version: state.version })).status, 400);
+  assert.equal((await request(a, 'profile')).body.points, 10000);
   assert.equal((await request(a, 'action', { code, action: 'start', version: state.version }, { 'X-CSRF-Token': 'bad' })).status, 403);
   assert.equal((await request(a, 'action', { code, action: 'start', version: state.version }, { Origin: 'https://evil.example' })).status, 403);
   assert.equal((await request(b, 'action', { code, action: 'start', version: state.version })).status, 400);
@@ -75,5 +88,49 @@ test('HTTP multiplayer, isolation, CSRF, competing moves, reconnect, and durable
   assert.equal(saved.version, chat.body.version); assert.deepEqual(saved.hand, discarded.body.hand); assert.equal(saved.turn, b.id);
   assert.equal(saved.messages.at(-1).text, '<script>alert(1)</script>');
   const finished = await request(b, 'action', { code, action: 'drop', version: saved.version }); assert.equal(finished.body.status, 'finished'); assert.equal(finished.body.result.winner, a.id);
+  assert.equal(finished.body.result.pointsAward.amount, 100);
+  assert.equal((await request(a, 'profile')).body.points, 10100);
+  assert.equal((await request(b, 'profile')).body.points, 10000);
+  // Repeated polls and rejected duplicate drops must not pay the same win again.
+  await request(a, `room?code=${code}`); await request(b, `room?code=${code}`);
+  assert.equal((await request(b, 'action', { code, action: 'drop', version: finished.body.version })).status, 400);
+  assert.equal((await request(a, 'profile')).body.wins, 1);
+  const c = await user();
+  assert.equal((await request(c, 'login', { username: 'sunil_test', password: 'incorrect-password' })).status, 400);
+  const crossDevice = await request(c, 'login', { username: 'SUNIL_TEST', password: 'password-for-test-only' });
+  assert.equal(crossDevice.body.id, a.id); assert.equal(crossDevice.body.room, code); assert.equal(crossDevice.body.account.points, 10100);
+  const authenticatedCookie = c.cookie;
+  await request(c, 'logout', { logout: true });
+  assert.equal((await request({ ...c, cookie: authenticatedCookie }, 'profile')).status, 401);
+  await request(c, 'login', { username: 'sunil_test', password: 'password-for-test-only' });
+  assert.equal(c.account.points, 10100);
+  await stop(); await start();
+  const retained = (await request(c, 'profile')).body;
+  assert.equal(retained.points, 10100); assert.equal(retained.historyTotal, 2); assert.equal(retained.wins, 1);
   const rematch = await request(a, 'action', { code, action: 'start', version: finished.body.version }); assert.equal(rematch.body.round, 2); assert.equal(rematch.body.hand.length, 13);
+});
+
+test('Existing guest deployment upgrades with a private backup and can save its seat as an account', async t => {
+  const data = await mkdtemp(join(tmpdir(), 'mr-upgrade-'));
+  const port = await availablePort(), base = `http://127.0.0.1:${port}`;
+  const token = 'a'.repeat(64), csrf = 'b'.repeat(48), php = process.env.PHP_BIN || 'php';
+  const room = JSON.parse(execFileSync(php, ['-r', 'require "server/game.php"; echo json_encode(rummy_create("legacy-seat", "Old guest"));'], { encoding: 'utf8' }));
+  const original = { sessions: { [token]: { id: 'legacy-seat', csrf, expires: Date.now() + 3600000 } }, rooms: { [room.code]: room }, limits: {}, cleanedAt: 0 };
+  const originalBytes = JSON.stringify(original);
+  await writeFile(join(data, 'state.json'), originalBytes, { mode: 0o600 });
+  const server = spawn(php, ['-S', `127.0.0.1:${port}`, '-t', 'public', 'public/router.php'], { env: { ...process.env, RUMMY_DEV: '1', RUMMY_TEST_DATA_DIR: data }, stdio: 'ignore' });
+  t.after(async () => { if (server.exitCode === null) { server.kill(); await new Promise(r => server.once('exit', r)); } await rm(data, { recursive: true, force: true }); });
+  for (let i = 0; i < 80; i++) { try { if ((await fetch(base)).ok) break; } catch {} await delay(50); }
+  const sessionResponse = await fetch(`${base}/api/session`, { headers: { Cookie: `mr_session=${token}` } });
+  const guest = await sessionResponse.json(); assert.equal(guest.id, 'legacy-seat'); assert.equal(guest.room, room.code); assert.equal(guest.account, null);
+  const backups = (await readdir(data)).filter(name => name.includes('.backup.json')); assert.equal(backups.length, 1);
+  assert.equal(await readFile(join(data, backups[0]), 'utf8'), originalBytes);
+  const migrated = JSON.parse(await readFile(join(data, 'state.json'), 'utf8')); assert.equal(migrated.schemaVersion, 2); assert.deepEqual(migrated.rooms[room.code], room);
+  const signup = await fetch(`${base}/api/register`, { method: 'POST', headers: { Cookie: `mr_session=${token}`, Origin: base, 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: JSON.stringify({ username: 'old_guest', name: 'Saved Player', password: 'test-upgrade-password' }) });
+  assert.equal(signup.status, 200); const account = await signup.json(); assert.equal(account.id, 'legacy-seat'); assert.equal(account.room, room.code); assert.equal(account.account.points, 10000);
+  const cookie = signup.headers.get('set-cookie').split(';')[0];
+  const resumed = await (await fetch(`${base}/api/room?code=${room.code}`, { headers: { Cookie: cookie } })).json();
+  assert.equal(resumed.players[0].name, 'Saved Player'); assert.equal(resumed.account.points, 10000);
+  await fetch(`${base}/api/session`, { headers: { Cookie: cookie } });
+  assert.equal((await readdir(data)).filter(name => name.includes('.backup.json')).length, 1);
 });

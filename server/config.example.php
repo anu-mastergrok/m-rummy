@@ -10,4 +10,6 @@ return [
     // Optional shared code required when creating a new table.
     'create_room_key' => '',
     'max_rooms' => 100,
+    // Play points credited per registered human opponent beaten in a round.
+    'win_points_per_opponent' => 100,
 ];

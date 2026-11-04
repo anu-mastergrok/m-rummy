@@ -13,4 +13,5 @@ with ZipFile(target, 'w', ZIP_DEFLATED) as archive:
         if path.is_file() and path.name != 'config.php':
             archive.write(path, 'server/' + path.name)
     archive.write(root / 'docs' / 'HOSTINGER.md', 'HOSTINGER.md')
+    archive.write(root / 'docs' / 'PROFILES.md', 'PROFILES.md')
 print(target)

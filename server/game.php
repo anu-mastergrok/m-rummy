@@ -52,10 +52,14 @@ function rummy_bot(array &$room, string $id): void {
     $p = rummy_player('bot-' . bin2hex(random_bytes(8)), "Bot $number", true);
     $room['players'][] = $p; rummy_log($room, $p['name'] . ' joined for practice.');
 }
-function rummy_start(array &$room, string $id): void {
+function rummy_start(array &$room, string $id, array $accountIds = [], int $winPoints = 100): void {
     rummy_require($room['host'] === $id, 'Only the host can deal a round.');
     rummy_require($room['status'] !== 'playing', 'A round is already in progress.');
     rummy_require(count($room['players']) >= 2, 'Invite a friend or add a practice bot first.');
+    $room['roundId'] = bin2hex(random_bytes(16));
+    $room['rewardParticipants'] = array_values(array_map(fn($p) => $p['id'], array_filter($room['players'], fn($p) => !$p['bot'] && in_array($p['id'], $accountIds, true))));
+    $room['winPointsPerOpponent'] = $winPoints;
+    $room['pointsSettled'] = false;
     $room['stock'] = rummy_shuffle(rummy_deck()); $room['discard'] = []; $room['indicator'] = array_pop($room['stock']);
     $room['wildRank'] = $room['indicator']['rank'] ?: 1;
     foreach ($room['players'] as &$p) { $p['hand'] = []; $p['dropped'] = false; $p['penalty'] = 0; $p['turns'] = 0; } unset($p);

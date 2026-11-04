@@ -19,7 +19,7 @@ The application expects to run at `/` on that host. Hosting at a URL subdirector
 
 Option A — no local build tools:
 
-1. Open [the repository's Actions page](https://github.com/anu-mastergrok/m-rummy/actions).
+1. Open [the repository's Actions page](https://github.com/mastergrok-technologies/m-rummy/actions).
 2. Open a successful **Check and test** run on `main`.
 3. Download the **m-rummy-hostinger** artifact (GitHub may require you to sign in).
 4. Extract the artifact download on your computer. Inside is `m-rummy-hostinger.zip`.
@@ -27,7 +27,7 @@ Option A — no local build tools:
 Option B — build from the repository:
 
 ```sh
-git clone https://github.com/anu-mastergrok/m-rummy.git
+git clone https://github.com/mastergrok-technologies/m-rummy.git
 cd m-rummy
 python3 tools/package.py
 ```
@@ -56,6 +56,7 @@ your-site-directory/
   server/
     bootstrap.php
     game.php
+    accounts.php
     rules.php
     config.example.php
   data/                  automatically created on the first API request
@@ -77,6 +78,7 @@ return [
     'data_dir' => dirname(__DIR__) . '/data',
     'create_room_key' => '',
     'max_rooms' => 100,
+    'win_points_per_opponent' => 100,
 ];
 ```
 
@@ -87,14 +89,19 @@ return [
 
 ## 5. Verify before inviting friends
 
-1. Open the site over HTTPS. Create a table with your name and a room password.
+1. Open the site over HTTPS. Create a player account and verify its profile balance starts at **10,000**. Create a table with a room password.
 2. Use **Invite friends** to copy its link.
 3. Open that link in a private/incognito window or another phone. Tabs in one browser profile are one player, so use a separate profile/device for the second player.
-4. Join using another name and the password. Both seats should appear within about 1–2 seconds.
+4. Register/sign in to a different player account, then join using the room password. Both seats should appear within about 1–2 seconds.
 5. As host, deal. Draw a card, select a card from your hand, and discard. Verify the other player's turn begins.
 6. Send a chat message. Refresh one browser and verify its hand/seat are restored.
 7. Drop in the other window to finish the round. Check the scores and deal a rematch.
 8. Open the site in **Android Chrome** and **iPhone Safari**. Verify card taps, horizontal hand scrolling, portrait/landscape layout, keyboard/chat, and reconnect after briefly backgrounding the browser. Use the footer's home-screen instructions if you want an app shortcut. Live games require internet; there is no offline play.
+9. After the two-human round, verify the winner received **100 extra play points** (default), the loser kept their balance, and refreshes do not repeat the reward. Sign out and sign back in on a second device to check the saved profile.
+
+## Existing installation: profiles and data upgrade
+
+See [PROFILES.md](PROFILES.md). No SQL migrations are needed: the first API request automatically backs up the existing guest-only save and upgrades it to schema version 2. Back up `server/config.php` and `data/` first; upload the full matching public/server release, including `.htaccess` and `accounts.php`. Keep your existing configuration/data. Profile balances and histories are retained indefinitely while that private data is preserved. A default win is worth 100 play points per registered human opponent, configurable using `win_points_per_opponent` in the private config.
 
 You can also create a fresh table and add a practice bot. Every actual move and winning declaration is checked by PHP; the browser never receives opponents' live hands or stock order.
 

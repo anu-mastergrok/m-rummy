@@ -8,8 +8,8 @@
   "scripts": {
     "start": "node tools/dev.mjs",
     "dev": "node tools/dev.mjs",
-    "test": "php test/run.php && node --test test/http.test.mjs",
-    "check": "node --check public/app.js && php -l server/rules.php && php -l server/game.php && php -l server/bootstrap.php && php -l public/api.php && php -l public/router.php",
+    "test": "php test/run.php && php test/accounts.php && node --test test/http.test.mjs",
+    "check": "node --check public/app.js && php -l server/rules.php && php -l server/game.php && php -l server/accounts.php && php -l server/bootstrap.php && php -l public/api.php && php -l public/router.php",
     "build": "npm run check",
     "package": "python3 tools/package.py"
   }
