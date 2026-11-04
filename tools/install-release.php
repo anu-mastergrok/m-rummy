@@ -31,11 +31,30 @@ function deploy_lock(string $path) {
     }
     return $file;
 }
-function install_release(string $root, string $stage, string $origin, string $sha): void {
+function install_release(string $root, string $stage, string $origin, string $sha, ?string $publicRoot = null): void {
     deploy_require(version_compare(PHP_VERSION, '8.2.0', '>='), 'PHP CLI 8.2 or newer is required on Hostinger.');
     deploy_require((bool)preg_match('/^[a-f0-9]{40}$/D', $sha), 'Invalid source commit.');
     deploy_require($root !== '/' && count(explode('/', trim($root, '/'))) >= 3 && !str_contains($root, '..') && !preg_match('#(?:^|/)public_html(?:/|$)#', $root), 'Choose the private site directory above public_html.');
-    deploy_require(realpath($root) === $root && !is_link($root) && is_dir($root . '/public_html') && !is_link($root . '/public_html'), 'Deployment root must exist with a real public_html directory.');
+    $publicRoot ??= $root . '/public_html';
+    deploy_require(realpath($root) === $root && !is_link($root), 'Private deployment root must be a real directory.');
+    deploy_require(realpath($publicRoot) === $publicRoot && is_dir($publicRoot) && !is_link($publicRoot), 'Public document root must exist and be a real directory.');
+    if ($publicRoot !== $root . '/public_html') {
+        // Only an explicit nested subdomain folder is allowed, never the main site root.
+        deploy_require((bool)preg_match('#^/home/([A-Za-z0-9_-]+)/domains/[A-Za-z0-9.-]+/public_html/[A-Za-z0-9_-]+$#D', $publicRoot, $match)
+            && str_starts_with($root, '/home/' . $match[1] . '/'), 'Choose a dedicated subdomain folder under the same hosting account.');
+    }
+    $target = static function(string $relative) use ($root, $publicRoot): string {
+        if (str_starts_with($relative, 'public_html/')) {
+            $path = deploy_path($root, $relative); // Validate release-relative syntax.
+            $path = $publicRoot;
+            foreach (explode('/', substr($relative, 12)) as $part) {
+                $path .= '/' . $part;
+                deploy_require(!is_link($path), 'Refusing a symlink in the public deployment path.');
+            }
+            return $path;
+        }
+        return deploy_path($root, $relative);
+    };
     deploy_require(realpath($stage) === $root . '/.rummy-staging/' . $sha, 'Invalid staging directory.');
     $parsed = parse_url($origin);
     deploy_require(is_array($parsed) && ($parsed['scheme'] ?? '') === 'https' && !empty($parsed['host']) && !isset($parsed['user']) && !isset($parsed['pass']) && !isset($parsed['query']) && !isset($parsed['fragment']) && empty($parsed['path']), 'Use the exact public HTTPS origin without a path.');
@@ -47,10 +66,10 @@ function install_release(string $root, string $stage, string $origin, string $sh
         deploy_require((bool)preg_match('#^(public|server)/[A-Za-z0-9_./-]+$#D', $source) && !str_contains($source, '..') && !in_array($source, ['server/config.php', 'public/router.php'], true), 'Release contains a protected or invalid file.');
         deploy_require(is_string($hash) && preg_match('/^[a-f0-9]{64}$/D', $hash) && is_file($stage . '/' . $source) && !is_link($stage . '/' . $source) && hash_file('sha256', $stage . '/' . $source) === $hash, 'Release file checksum failed.');
         $relative = str_starts_with($source, 'public/') ? 'public_html/' . substr($source, 7) : $source;
-        deploy_path($root, $relative); $mapping[$relative] = $source;
+        $target($relative); $mapping[$relative] = $source;
     }
-    deploy_require(!is_file($root . '/public_html/wp-config.php') && !is_file($root . '/public_html/index.php'), 'This document root belongs to another PHP site. Use a dedicated empty subdomain.');
-    if (is_file($root . '/public_html/index.html')) deploy_require(str_contains(file_get_contents($root . '/public_html/index.html'), 'M Rummy'), 'Refusing to overwrite an unrelated index.html.');
+    deploy_require(!is_file($publicRoot . '/wp-config.php') && !is_file($publicRoot . '/index.php'), 'This document root belongs to another PHP site. Use a dedicated empty subdomain.');
+    if (is_file($publicRoot . '/index.html')) deploy_require(str_contains(file_get_contents($publicRoot . '/index.html'), 'M Rummy'), 'Refusing to overwrite an unrelated index.html.');
     if (is_file($root . '/server/bootstrap.php')) deploy_require(str_contains(file_get_contents($root . '/server/bootstrap.php'), 'M Rummy'), 'Refusing to overwrite another application server directory.');
     $guard = deploy_lock($root . '/.deploy.lock'); $stateLock = null; $backup = null; $changed = []; $createdConfig = false;
     try {
@@ -76,7 +95,7 @@ function install_release(string $root, string $stage, string $origin, string $sh
         if (is_file($data . '/state.json')) deploy_copy($data . '/state.json', $backup . '/state.json', 0600);
         $existing = [];
         foreach ($mapping as $relative => $source) {
-            $destination = deploy_path($root, $relative);
+            $destination = $target($relative);
             $existing[$relative] = is_file($destination);
             if ($existing[$relative]) deploy_copy($destination, $backup . '/code/' . $relative);
         }
@@ -93,11 +112,15 @@ function install_release(string $root, string $stage, string $origin, string $sh
                 deploy_copy($configTemp, $configPath, 0600); $createdConfig = true;
             } finally { if (is_file($configTemp)) unlink($configTemp); }
         }
+        // Bind the public entry point to private code and the same deployment lock.
+        $apiText = str_replace('dirname(__DIR__)', var_export($root, true), file_get_contents($stage . '/public/api.php'));
+        $boundApi = $backup . '/bound-api.php';
+        deploy_require(file_put_contents($boundApi, $apiText) === strlen($apiText), 'Cannot prepare private API binding.');
         // Install the request guard first; new API requests return retryable 503
         // during this short update. Existing file-lock-aware requests finish first.
         $ordered = ['public_html/api.php' => $mapping['public_html/api.php']] + $mapping;
         foreach ($ordered as $relative => $source) {
-            deploy_copy($stage . '/' . $source, deploy_path($root, $relative));
+            deploy_copy($source === 'public/api.php' ? $boundApi : $stage . '/' . $source, $target($relative));
             $changed[] = $relative;
         }
         $marker = json_encode(['commit' => $sha, 'deployedAt' => gmdate(DATE_ATOM), 'backup' => basename($backup)], JSON_THROW_ON_ERROR);
@@ -108,7 +131,7 @@ function install_release(string $root, string $stage, string $origin, string $sh
         $rollbackFailed = false;
         foreach (array_reverse($changed) as $relative) {
             try {
-                $destination = deploy_path($root, $relative);
+                $destination = $target($relative);
                 if (is_file($backup . '/code/' . $relative)) deploy_copy($backup . '/code/' . $relative, $destination);
                 elseif (is_file($destination)) deploy_require(unlink($destination), 'Cannot remove a new release file.');
             } catch (Throwable) { $rollbackFailed = true; }
@@ -123,7 +146,8 @@ function install_release(string $root, string $stage, string $origin, string $sh
 }
 if (PHP_SAPI === 'cli' && realpath($_SERVER['SCRIPT_FILENAME']) === __FILE__) {
     try {
-        deploy_require($argc === 5, 'Usage: php install.php SITE_DIRECTORY STAGING_DIRECTORY HTTPS_ORIGIN COMMIT_SHA');
-        install_release($argv[1], $argv[2], $argv[3], $argv[4]);
+        deploy_require(($argc === 5 || $argc === 6), 'Usage: php install.php SITE_DIRECTORY STAGING_DIRECTORY HTTPS_ORIGIN COMMIT_SHA [PUBLIC_DIRECTORY]');
+        install_release($argv[1], $argv[2], $argv[3], $argv[4], $argv[5] ?? null);
     } catch (Throwable $e) { fwrite(STDERR, 'Deployment stopped: ' . $e->getMessage() . "\n"); exit(1); }
 }
+

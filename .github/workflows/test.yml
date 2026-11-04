@@ -48,6 +48,7 @@ jobs:
       HOSTINGER_SSH_USER: ${{ secrets.HOSTINGER_SSH_USER }}
       HOSTINGER_SSH_PORT: ${{ vars.HOSTINGER_SSH_PORT || '65002' }}
       HOSTINGER_DEPLOY_PATH: ${{ vars.HOSTINGER_DEPLOY_PATH }}
+      HOSTINGER_PUBLIC_PATH: ${{ vars.HOSTINGER_PUBLIC_PATH }}
       HOSTINGER_APP_URL: ${{ vars.HOSTINGER_APP_URL }}
       HOSTINGER_PHP_BINARY: ${{ vars.HOSTINGER_PHP_BINARY || 'php' }}
     steps:
@@ -91,3 +92,4 @@ jobs:
       - name: Remove runner SSH identity
         if: always()
         run: rm -rf -- "$RUNNER_TEMP/m-rummy-ssh"
+
