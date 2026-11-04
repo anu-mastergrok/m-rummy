@@ -9,7 +9,7 @@ Official references:
 
 ## Automatic deployment from GitHub
 
-Use [GITHUB_ACTIONS.md](GITHUB_ACTIONS.md) to configure SSH-based deployment on this Premium plan. The existing **Check and test** workflow can deploy tested `main` commits automatically or on a manual run. Add the four Hostinger secrets and required repository variables, then enable deployment. Existing config, accounts, and points are preserved with a private backup; active rounds block an update. The manual upload instructions below remain available.
+Use [GITHUB_ACTIONS.md](GITHUB_ACTIONS.md) to configure SSH-based deployment on this Premium plan. The existing **Check and test** workflow can deploy tested `main` commits automatically or on a manual run. Add the four Hostinger secrets and required repository variables, then enable deployment. For a subdomain mapped beneath the main domain’s public_html, set HOSTINGER_PUBLIC_PATH to that subdomain folder while keeping HOSTINGER_DEPLOY_PATH private; see the existing-subdomain section in GITHUB_ACTIONS.md. Existing config, accounts, and points are preserved with a private backup; active rounds block an update. The manual upload instructions below remain available.
 
 ## 1. Prepare a dedicated site
 
@@ -130,3 +130,4 @@ You can also create a fresh table and add a practice bot. Every actual move and 
 Before updating, finish all rounds and back up **`server/config.php` plus the complete private `data/` directory**. Upload changed public/server code, keeping the same private configuration and data. Rebuild or download a new upload ZIP after each release; never overwrite your private state with a sample save. Avoid file updates in the middle of rounds.
 
 The project includes tests and CI, but a deployment on your specific Hostinger account still needs the checks above. No Hostinger account credentials or live deployment are included in this repository.
+

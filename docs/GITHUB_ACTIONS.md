@@ -19,9 +19,40 @@ Use a dedicated Hostinger PHP website/domain with this layout:
   .rummy-staging/                           ← temporary code-only releases
 ```
 
-Replace the example with your real path, found in File Manager or with `pwd` over SSH one level above `public_html`. The directory and its `public_html` folder must already exist. The workflow supports the standard `public_html` layout; do not point it at the home directory itself, the public folder, a WordPress site, or a subfolder inside another website's public document root. It refuses unrelated `index.php`/`index.html` sites and symlink deployment paths. See [HOSTINGER.md](HOSTINGER.md) for domain, PHP 8.2+, and SSL setup.
+Replace the example with your real path, found in File Manager or with `pwd` over SSH one level above `public_html`. The directory and its `public_html` folder must already exist for the default layout. For an existing nested subdomain use the separate public path below; do not point it at the home directory itself, the public folder, a WordPress site, or a subfolder inside another website's public document root. It refuses unrelated `index.php`/`index.html` sites and symlink deployment paths. See [HOSTINGER.md](HOSTINGER.md) for domain, PHP 8.2+, and SSL setup.
 
 For an existing M Rummy installation, keep the same site directory and private configuration/data. Your existing `app_origin` must exactly match the deployment URL. Your PHP worker must be able to read the private deployment lock; use the normal account-owned Hostinger file permissions.
+
+### Existing subdomain under the main domain
+
+For a Hostinger subdomain already mapped to a folder beneath another site's
+public_html, set **HOSTINGER_PUBLIC_PATH** separately. For m.trecx.us use:
+
+| Repository variable | Value |
+| --- | --- |
+| HOSTINGER_DEPLOY_PATH | /home/u575788507/domains/m.trecx.us |
+| HOSTINGER_PUBLIC_PATH | /home/u575788507/domains/trecx.us/public_html/m |
+| HOSTINGER_APP_URL | https://m.trecx.us |
+| HOSTINGER_PHP_BINARY | php |
+
+Both directories must exist. Keep the current private deployment root to retain
+any existing configuration and points. The installer puts only public release
+files into the subdomain folder and binds api.php to the private server and
+deployment lock. Private data, configuration, staging, and backups remain under
+HOSTINGER_DEPLOY_PATH. It does not change the parent site's files.
+
+The custom public path must be a real, non-symlink directory matching
+/home/ACCOUNT/domains/DOMAIN/public_html/SUBDOMAIN_FOLDER under the same account.
+The main public_html directory itself is refused. The folder must be dedicated to
+M Rummy; unrelated index.php, WordPress, or index.html sites are refused.
+
+Ensure hPanel maps m.trecx.us to this exact public folder and DNS/SSL reach this
+hosting account. Deployment does not change DNS or Hostinger virtual hosts. A
+static test file must be reachable there before expecting the API smoke check
+to succeed. An inherited parent .htaccess may also affect subdomain requests.
+
+Omitting HOSTINGER_PUBLIC_PATH preserves the original SITE_DIRECTORY/public_html
+layout. Do not switch public targets while live players are using the old one.
 
 ## 2. Set up an SSH deploy key
 
@@ -64,6 +95,7 @@ In the same settings page, under **Variables**, add:
 | Variable | Example / behavior |
 | --- | --- |
 | `HOSTINGER_DEPLOY_PATH` | `/home/u123456789/domains/rummy.example.com` — private site directory above `public_html`, no trailing slash |
+| `HOSTINGER_PUBLIC_PATH` | Optional separate subdomain document root; defaults to HOSTINGER_DEPLOY_PATH/public_html. See above. |
 | `HOSTINGER_APP_URL` | `https://rummy.example.com` — exact origin, no trailing slash or path, SSL already working |
 | `HOSTINGER_DEPLOY_ENABLED` | `true` — enable after all settings are ready; omit or set `false` to keep deployment off |
 | `HOSTINGER_SSH_PORT` | Optional; defaults to `65002`; confirm in hPanel |
@@ -103,7 +135,7 @@ Backups are intentionally retained for manual recovery; monitor disk space and r
 | Missing secret / key parse error | Check all four secret names and the full unencrypted private key, including newlines. |
 | Host key verification failed | Check the same host/IP and port against hPanel; update the verified known-hosts secret only after confirming the fingerprint. |
 | Permission denied (publickey) | Authorize the matching `.pub` key on the correct Hostinger account; confirm the username. |
-| Target directory refused | Set the dedicated site directory above a real `public_html`, not a WordPress/public directory or symlink. |
+| Target directory refused | Keep the private site directory outside public_html; set HOSTINGER_PUBLIC_PATH for a nested subdomain. Both configured directories must exist and be real, not symlinks. |
 | PHP CLI too old | Verify `php -v` over SSH and set `HOSTINGER_PHP_BINARY` to the available 8.2+ executable. |
 | A round is still playing | Finish the round, then run the workflow again. No code or balances were replaced. |
 | Wrong existing `app_origin` | Correct it in private `server/config.php`, or fix `HOSTINGER_APP_URL`. |
@@ -112,3 +144,4 @@ Backups are intentionally retained for manual recovery; monitor disk space and r
 | Automatic migration reports an error | Preserve the private data and migration backups; use [PROFILES.md](PROFILES.md). Do not reset `state.json`. |
 
 For manual recovery, stop new requests first, inspect the private snapshot's `files.json`, and restore matching code carefully. Do not restore an old `state.json` blindly: doing so loses accounts and point awards created since that snapshot. Prefer fixing code/config forward. A live Hostinger deployment remains unverified until you configure the secrets/variables and a real deploy job succeeds.
+

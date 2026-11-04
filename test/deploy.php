@@ -3,9 +3,9 @@ declare(strict_types=1);
 require __DIR__ . '/helpers.php';
 require __DIR__ . '/../tools/install-release.php';
 $fixtures = [];
-function fixture(bool $existing = true): array {
+function fixture(bool $existing = true, ?string $baseDirectory = null): array {
     global $fixtures;
-    $base = sys_get_temp_dir() . '/mr-deploy-' . bin2hex(random_bytes(6)); $fixtures[] = $base;
+    $base = ($baseDirectory ?? sys_get_temp_dir()) . '/mr-deploy-' . bin2hex(random_bytes(6)); $fixtures[] = $base;
     $root = $base . '/site'; $sha = str_repeat('a', 40); $stage = $root . '/.rummy-staging/' . $sha;
     mkdir($root . '/public_html', 0755, true); mkdir($stage, 0700, true);
     $files = ['public/index.html', 'public/api.php', 'public/.htaccess', 'public/app.js', 'server/bootstrap.php', 'server/accounts.php', 'server/game.php', 'server/rules.php'];
@@ -89,4 +89,34 @@ test('A failed code copy rolls back earlier updates and never restores or overwr
     same(file_get_contents($root . '/public_html/api.php'), $oldApi); same(file_get_contents($root . '/server/bootstrap.php'), $oldServer);
     same(file_get_contents($root . '/data/state.json'), $oldState); check(!file_exists($root . '/server/accounts.php')); check(!file_exists($root . '/.m-rummy-deploy.json'));
 });
+test('Nested subdomain deployment binds private code and preserves the main website and points', function() {
+    $home = getenv('HOME');
+    check((bool)preg_match('#^/home/[A-Za-z0-9_-]+$#D', $home));
+    $f = fixture(true, $home); [$root, $stage, $sha] = $f;
+    // Both roots share the same hosting account but only public assets go under the main domain.
+    $domain = $home . '/domains/mr-test-' . bin2hex(random_bytes(6));
+    global $fixtures; $fixtures[] = $domain;
+    $public = $domain . '/public_html/m';
+    mkdir($public, 0755, true);
+    file_put_contents($domain . '/public_html/index.php', '<?php /* main app */');
+    file_put_contents($public . '/api.php', '<?php /* old subdomain API */');
+    $state = file_get_contents($root . '/data/state.json');
+    ob_start();
+    try { install_release($root, $stage, 'https://rummy.example.com', $sha, $public); }
+    finally { ob_end_clean(); }
+    same(file_get_contents($domain . '/public_html/index.php'), '<?php /* main app */');
+    same(file_get_contents($root . '/data/state.json'), $state);
+    $api = file_get_contents($public . '/api.php');
+    check(str_contains($api, var_export($root, true) . " . '/server/bootstrap.php'"));
+    check(str_contains($api, var_export($root, true) . " . '/.deploy.lock'"));
+    check(!file_exists($public . '/server')); check(!file_exists($public . '/data'));
+    ob_start();
+    try { install_release($root, $stage, 'https://rummy.example.com', $sha, $public); }
+    finally { ob_end_clean(); }
+    same(file_get_contents($root . '/data/state.json'), $state);
+    rejects(fn() => install_release($root, $stage, 'https://rummy.example.com', $sha, $domain . '/public_html'), 'dedicated subdomain');
+    unlink($public . '/app.js'); symlink($domain . '/public_html/index.php', $public . '/app.js');
+    rejects(fn() => install_release($root, $stage, 'https://rummy.example.com', $sha, $public), 'symlink');
+});
 echo "\n$passed deployment safety tests passed.\n";
+
