@@ -13,6 +13,7 @@
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/figma.css">
   <script type="module" src="/app.js"></script>
 </head>
 <body>
@@ -20,6 +21,7 @@
     <a class="brand" href="/" aria-label="M Rummy home"><span class="brand-mark">♣</span><span>M<span class="brand-light"> RUMMY</span></span></a>
     <div class="header-right"><span class="free-pill"><span></span> Just for the fun of it</span><button class="profile-button" id="profile-button" hidden></button><button class="text-button" id="rules-button">How to play <span aria-hidden="true">↗</span></button></div>
   </header>
+  <div id="connection-banner" class="connection-banner" role="status" hidden>Connection interrupted. Reconnecting to your table… <button id="reconnect-button" type="button">Try now</button></div>
   <main id="app"><p class="loading">Setting your table…</p></main>
   <footer class="site-footer"><span>A little friendly competition. A lot of good company.</span><button id="mobile-button" class="footer-button">Add to your home screen ↗</button><span>13-card Indian rummy · No money involved</span></footer>
   <div id="toast" role="status" aria-live="polite"></div>
@@ -42,5 +44,6 @@
   <dialog id="invite-dialog"><div class="dialog-head"><span class="eyebrow">SAVE A SEAT</span><button class="icon-button" data-close="invite-dialog" aria-label="Close invite">×</button></div><h2>Bring your people.</h2><p>Share this link with your friends. Send the room password separately if you set one.</p><label for="invite-url">Your invite link</label><input id="invite-url" readonly><button class="button primary full" id="copy-invite">Copy invite link</button></dialog>
   <dialog id="mobile-dialog"><div class="dialog-head"><span class="eyebrow">YOUR TABLE, ANYWHERE</span><button class="icon-button" data-close="mobile-dialog" aria-label="Close mobile guide">×</button></div><h2>A seat in your pocket.</h2><p>Play directly in Android Chrome or iPhone/iPad Safari. No download is required. An internet connection is needed throughout the game.</p><h3>Android</h3><p>Open this site in Chrome. Use the browser menu → <strong>Add to Home screen</strong> or <strong>Install app</strong>, depending on your browser version.</p><h3>iPhone &amp; iPad</h3><p>Open this site in Safari. Tap <strong>Share → Add to Home Screen</strong>. Keep using the same browser or home-screen app to retain your seat; a different browser or installation may have a separate session.</p><p>Tap cards to select them. Swipe your hand sideways to see all your groups. Portrait and landscape both work. If your phone locks or changes networks, return to the page to reconnect.</p><button class="button primary full" data-close="mobile-dialog">Back to the table</button></dialog>
   <dialog id="profile-dialog"><div class="dialog-head"><span class="eyebrow">YOUR PLAYER PROFILE</span><button class="icon-button" data-close="profile-dialog" aria-label="Close profile">×</button></div><div id="profile-content"></div></dialog>
+  <dialog id="game-dialog" class="game-dialog"><div class="dialog-head"><span class="eyebrow" id="game-dialog-label">YOUR TABLE</span><button class="icon-button" data-close="game-dialog" aria-label="Close">×</button></div><div id="game-dialog-content"></div></dialog>
 </body>
 </html>

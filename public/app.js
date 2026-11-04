@@ -3,6 +3,9 @@ const suits = { S: '♠', H: '♥', D: '♦', C: '♣', J: '✦' };
 const ranks = { 0: 'JK', 1: 'A', 11: 'J', 12: 'Q', 13: 'K' };
 let session, state, busy = false, polling = false, failures = 0, mode = 'create', groups = [], selected = new Set(), chatDraft = '', clockOffset = 0;
 let lastCode = '', confirmAction;
+let roomPanel = '', tutorialStep = 0;
+const art = name => `/assets/figma/${name}`;
+const icon = (name, text = '') => `<span class="design-icon" aria-hidden="true"><img src="${art(name)}" alt=""></span>${text}`;
 let authMode = 'register', account = null, profileOffset = 0, authBusy = false;
 const number = value => Number(value || 0).toLocaleString('en-IN');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -49,6 +52,8 @@ function accept(next) {
 function landing() {
   state = null; selected.clear(); groups = [];
   app.className = 'landing';
+  document.body.classList.remove('at-table');
+  roomPanel = '';
   const invite = new URLSearchParams(location.search).get('room') || '';
   if (invite) mode = 'join';
   app.innerHTML = `<section class="hero-copy"><div class="eyebrow"><span class="tiny-club">♣</span> THE BEST SEAT IS WITH FRIENDS</div><h1>Good cards.<br><em>Better company.</em></h1><p class="hero-sub">Your people. Your table. Bring everyone together for a little rummy, wherever the evening finds you.</p><div class="hero-details"><span><b>13</b> cards</span><i></i><span><b>2–6</b> players</span><i></i><span><b>∞</b> good times</span></div><div class="hero-note"><span>✦</span> Private rooms. Friendly points. Always free.</div></section>
@@ -97,6 +102,7 @@ function renderRoom() {
   const focus = document.activeElement?.id;
   const selectionStart = document.activeElement?.selectionStart;
   app.className = 'room-page';
+  document.body.classList.add('at-table');
   const me = state.players.find(p => p.id === state.me), host = state.host === state.me;
   const playing = state.status === 'playing', myTurn = playing && state.turn === state.me && !me.dropped;
   const canDiscard = myTurn && state.phase === 'discard';
@@ -105,12 +111,29 @@ function renderRoom() {
   const loose = state.hand.filter(c => !inGroups.has(c.id));
   const groupView = (ids, title, i) => `<div class="hand-group"><div class="group-heading"><span>${esc(title)}</span>${i !== undefined ? `<button class="ungroup" data-ungroup="${i}" aria-label="Ungroup ${esc(title)}">×</button>` : ''}</div><div class="cards">${ids.map(id => card(state.hand.find(c => c.id === id), true)).join('')}</div></div>`;
   app.innerHTML = `<div class="room-heading"><div><div class="eyebrow">YOUR PRIVATE CLUB <span class="connection" id="connection">● Connected</span></div><h1>The friends’ table<span class="round-badge">${state.round ? `Round ${state.round}` : 'Waiting room'}</span></h1></div><div class="button-row"><button class="button secondary small" data-action="invite">Invite friends <span>↗</span></button><button class="icon-button leave-button" data-action="leave" aria-label="Leave table" title="Leave table">⇥</button></div></div>
-  <div class="game-layout"><section class="table-column"><div class="felt-table"><div class="felt-top"><span>13-CARD INDIAN RUMMY</span><span class="room-code">ROOM ${state.code} ${state.hasPassword ? '· LOCKED' : ''}</span></div><div class="seats">${state.players.filter(p => p.id !== state.me).map(p => `<div class="seat ${playing && state.turn === p.id ? 'active' : ''} ${p.dropped ? 'dropped' : ''}"><div class="avatar">${p.bot ? '✦' : esc(p.name.slice(0, 1).toUpperCase())}</div><strong>${esc(p.name)}</strong><span>${p.bot ? 'Practice bot' : p.id === state.host ? 'Table host' : 'Friend'}${p.dropped ? ' · Dropped' : playing ? ` · ${p.count} cards` : ''}</span>${playing && !p.dropped ? '<div class="mini-hand">▥ ▥ ▥ ▥ ▥</div>' : ''}${host && isLobby && p.bot ? `<button class="remove-bot" data-remove="${p.id}">Remove</button>` : ''}</div>`).join('')}${state.players.length < 6 && isLobby ? `<button class="seat empty-seat" data-action="invite"><span class="avatar">+</span><strong>A seat for a friend</strong><span>Share your invite link</span></button>` : ''}</div>
+  <div class="game-layout"><section class="table-column"><div class="felt-table"><div class="felt-top"><span>13-CARD INDIAN RUMMY</span><span class="room-code">ROOM ${state.code} ${state.hasPassword ? '· LOCKED' : ''}</span></div><div class="seats">${state.players.filter(p => p.id !== state.me).map(p => `<div class="seat ${playing && state.turn === p.id ? 'active' : ''} ${p.dropped ? 'dropped' : ''}"><div class="avatar"><img src="${art(p.id === state.host ? 'img2LudoProfilePicture17.png' : 'img2LudoProfilePicture13.png')}" alt="">${p.id === state.host ? '<span class="dealer-badge" title="Table host">H</span>' : ''}</div><strong>${esc(p.name)}</strong><b class="seat-points">${number(p.total)} Pts</b><span>${p.bot ? 'Practice bot' : p.id === state.host ? 'Table host' : 'Friend'}${p.dropped ? ' · Dropped' : playing ? ` · ${p.count} cards` : ''}</span>${playing && !p.dropped ? '<div class="mini-hand">▥ ▥ ▥ ▥ ▥</div>' : ''}${host && isLobby && p.bot ? `<button class="remove-bot" data-remove="${p.id}">Remove</button>` : ''}</div>`).join('')}${state.players.length < 6 && isLobby ? `<button class="seat empty-seat" data-action="invite"><span class="avatar">+</span><strong>A seat for a friend</strong><span>Share your invite link</span></button>` : ''}</div>
   ${state.status === 'lobby' ? `<div class="lobby-center"><span class="table-club">♣</span><h2>Great company.<br>One good game.</h2><p>${host ? 'Invite a friend or add a practice bot to get started.' : 'Make yourself comfortable. Your host will deal shortly.'}</p><div class="button-row">${host ? `<button class="button cream" data-action="start" ${state.players.length < 2 ? 'disabled' : ''}>Deal the first round <span>→</span></button><button class="button felt-outline" data-action="addBot" ${state.players.length >= 6 ? 'disabled' : ''}>+ Practice bot</button>` : '<span class="waiting-label">Waiting for the host to deal…</span>'}</div></div>` : `<div class="deck-area"><div class="pile"><span class="pile-label">CLOSED DECK</span><button class="card card-back" data-draw="stock" ${!myTurn || state.phase !== 'draw' ? 'disabled' : ''} aria-label="Draw from closed deck"><span>♣</span><small>M RUMMY</small></button><span class="pile-caption">${state.stockCount} cards</span></div><div class="pile"><span class="pile-label">OPEN DECK</span><button class="open-pile" data-draw="discard" ${!myTurn || state.phase !== 'draw' || !state.topDiscard || [0, state.wildRank].includes(state.topDiscard.rank) ? 'disabled' : ''} aria-label="Draw from open deck">${state.topDiscard ? card(state.topDiscard) : '<span class="empty-card">Empty</span>'}</button><span class="pile-caption">${state.topDiscard && [0, state.wildRank].includes(state.topDiscard.rank) ? 'Joker · cannot pick' : 'Take the top card'}</span></div><div class="wild-indicator"><span class="pile-label">WILD JOKER</span>${card(state.indicator)}<span class="pile-caption">All ${ranks[state.wildRank] || state.wildRank}s are wild</span></div></div>`}
   <div class="table-status"><span class="status-dot"></span><span>${esc(turnText())}</span>${playing ? '<span id="turn-clock" class="turn-clock"></span>' : ''}</div></div>
   ${state.status === 'finished' ? `<section class="results"><div class="results-title"><span class="eyebrow">ROUND ${state.round} · ${state.result.reason === 'last-player' ? 'LAST PLAYER STANDING' : 'VALID DECLARATION'}</span><h2>${esc(state.result.winnerName)} wins <span>✦</span></h2>${state.result.pointsAward ? `<p class="win-points">${state.result.pointsAward.amount ? `+${number(state.result.pointsAward.amount)} play points credited to ${esc(state.result.winnerName)}’s profile` : 'No profile points awarded for this round'}</p>` : ''}</div><div class="score-table-wrap"><table class="score-table"><thead><tr><th>Player</th><th>Round penalty</th><th>Penalty total ↓</th></tr></thead><tbody>${state.result.scores.map(p => `<tr class="${p.id === state.result.winner ? 'winner-row' : ''}"><td>${esc(p.name)} ${p.id === state.result.winner ? '♣' : p.dropped ? '<small>Dropped</small>' : ''}</td><td>${p.penalty}</td><td>${p.total}</td></tr>`).join('')}</tbody></table></div>${state.result.groups.length ? `<details class="winner-hand"><summary>See the winning groups</summary>${state.result.groups.map(g => `<div><span>${g.type === 'pure' ? 'Pure sequence' : g.type === 'set' ? 'Set' : 'Sequence'}</span><div class="cards">${g.ids.map(id => card(state.result.scores.find(p => p.id === state.result.winner).hand.find(c => c.id === id))).join('')}</div></div>`).join('')}</details>` : ''}<div class="button-row">${host ? '<button class="button primary" data-action="start">Deal another round →</button>' : '<p>Waiting for the host to deal again.</p>'}${host && state.players.length < 6 ? '<button class="button secondary" data-action="addBot">+ Practice bot</button>' : ''}</div></section>` : ''}
-  <section class="hand-panel"><div class="hand-header"><div><span class="eyebrow">${esc(me.name)} ${host ? '· HOST' : ''}</span><h2>Your hand <span>${state.hand.length} cards${me.dropped ? ' · Dropped' : ''}</span></h2></div><div class="hand-tools"><button class="text-button" data-action="sort" ${!state.hand.length ? 'disabled' : ''}>Sort ↕</button><button class="text-button" data-action="arrange" ${!state.hand.length ? 'disabled' : ''}>Auto-group ✦</button><button class="text-button" data-action="group" ${selected.size < 3 ? 'disabled' : ''}>Group (${selected.size})</button></div></div><div class="hand-scroll">${state.hand.length ? `${groups.map((g, i) => groupView(g.ids, g.title || `Group ${i + 1}`, i)).join('')}${loose.length ? groupView(loose.map(c => c.id), groups.length ? 'Ungrouped' : 'Tap cards to select · group 3 or more') : ''}` : '<div class="hand-placeholder"><span>♠ ♥ ♣ ♦</span><p>Your 13 cards will be right here when the round starts.</p></div>'}</div><div class="hand-footer"><span class="hand-hint">${me.dropped ? 'You’re watching this round. You’ll be back in the next one.' : canDiscard ? selected.size === 1 ? 'One card selected. Discard it, or declare if the rest of your hand is ready.' : 'Select one card for your discard.' : myTurn ? 'Pick a card from either deck to begin your turn.' : 'Select cards to make groups while you wait.'}</span><div class="button-row"><button class="button secondary small" data-action="drop" ${!playing || me.dropped || (myTurn && state.phase === 'discard') ? 'disabled' : ''}>Drop · ${me.turns === 0 ? '20' : '40'}</button><button class="button secondary small" data-action="discard" ${!canDiscard || selected.size !== 1 ? 'disabled' : ''}>Discard</button><button class="button primary small" data-action="declare" ${!canDiscard || selected.size !== 1 ? 'disabled' : ''}>Declare ↗</button></div></div></section></section>
+  <section class="hand-panel"><div class="hand-header"><div><span class="eyebrow">${esc(me.name)} ${host ? '· HOST' : ''}</span><h2>Your hand <span>${state.hand.length} cards${me.dropped ? ' · Dropped' : ''}</span></h2></div><div class="hand-tools"><button class="text-button" data-action="sort" ${!state.hand.length ? 'disabled' : ''}>Sort ↕</button><button class="text-button" data-action="arrange" ${!state.hand.length ? 'disabled' : ''}>Auto-group ✦</button><button class="text-button" data-action="group" ${selected.size < 3 ? 'disabled' : ''}>Group (${selected.size})</button></div></div><div class="hand-scroll">${state.hand.length ? `${groups.map((g, i) => groupView(g.ids, g.title || `Group ${i + 1}`, i)).join('')}${loose.length ? groupView(loose.map(c => c.id), groups.length ? 'Ungrouped' : 'Tap cards to select · group 3 or more') : ''}` : '<div class="hand-placeholder"><span>♠ ♥ ♣ ♦</span><p>Your 13 cards will be right here when the round starts.</p></div>'}</div><div class="hand-footer"><span class="hand-hint">${me.dropped ? 'You’re watching this round. You’ll be back in the next one.' : canDiscard ? selected.size === 1 ? 'One card selected. Discard it, or declare if the rest of your hand is ready.' : 'Select one card for your discard.' : myTurn ? 'Pick a card from either deck to begin your turn.' : 'Select cards to make groups while you wait.'}</span><div class="button-row"><button class="button secondary small" data-action="drop" ${!playing || me.dropped || (myTurn && state.phase === 'discard') ? 'disabled' : ''}>Drop · ${me.turns === 0 ? '20' : '40'}</button><button class="button secondary small discard-action" data-action="discard" ${!canDiscard || selected.size !== 1 ? 'disabled' : ''}>${icon('imgDelete.svg', 'Discard')}</button><button class="button primary small declare-action" data-action="declare" ${!canDiscard || selected.size !== 1 ? 'disabled' : ''}>${icon('imgLike.svg', 'Declare')}</button></div></div></section></section>
   <aside class="sidebar"><section class="side-card"><div class="side-heading"><h2>Table talk</h2><span>${state.players.length}/6 seated</span></div><div class="messages" id="messages">${state.messages.length ? state.messages.map(m => `<div class="message"><span>${esc(m.name)} <time>${new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></span><p>${esc(m.text)}</p></div>`).join('') : '<div class="empty-chat"><span>“</span><p>The best part of cards?<br>The conversation.</p><small>Say hello to your table.</small></div>'}</div><form class="chat-form" id="chat-form"><label class="sr-only" for="chat-input">Message your table</label><input id="chat-input" maxlength="240" placeholder="Say something…" required autocomplete="off" value="${esc(chatDraft)}"><button type="submit" aria-label="Send message">↑</button></form></section><section class="side-card activity"><div class="side-heading"><h2>At the table</h2><span class="live-dot">LIVE</span></div><div>${state.activity.slice(0, 7).map(a => `<p><span></span>${esc(a.text)}</p>`).join('')}</div></section><section class="table-tip"><span>✧ THE WINNING HAND</span><p>Two sequences.<br>One of them pure.<br><em>The rest is up to you.</em></p><button class="text-button" data-action="rules">A quick rules refresher ↗</button></section>${state.history.length > 1 ? `<details class="side-card history"><summary>Previous rounds</summary>${state.history.slice(1).map(h => `<p>Round ${h.round} <strong>${esc(h.winner)}</strong></p>`).join('')}</details>` : ''}</aside></div>`;
+  const table = app.querySelector('.felt-table');
+  table.append(app.querySelector('.hand-panel'));
+  const status = table.querySelector('.table-status');
+  table.after(status);
+  const heading = app.querySelector('.room-heading');
+  heading.innerHTML = `<button class="board-home" data-action="leave">${icon('imgLeftArrow.svg', 'Home')}</button><div class="board-details"><strong>13-card Rummy</strong><span>Round ${state.round || '—'}</span><span>${state.players.length}/6 players</span><span>${number(account?.points)} pts</span></div><button class="board-refresh" data-action="refresh">Refresh ${icon('imgRefresh.svg')}</button>`;
+  table.insertAdjacentHTML('beforeend', `<div class="board-controls"><button class="board-control" data-action="settings" aria-label="Game settings" aria-expanded="${roomPanel === 'settings'}">${icon('imgIcons8Settings2.svg')}</button><button class="board-control" data-action="chat" aria-label="Table chat" aria-expanded="${roomPanel === 'chat'}">${icon('imgChat.svg')}</button></div>`);
+  status.insertAdjacentHTML('afterbegin', `<span class="self-avatar"><img src="${art('img2LudoProfilePicture02.png')}" alt=""><span>${esc(me.name)}</span></span>`);
+  if (playing) table.querySelector('.deck-area').insertAdjacentHTML('beforeend', `<button class="show-zone" data-action="declare" ${!canDiscard || selected.size !== 1 ? 'disabled' : ''}>SHOW<br>HERE</button>`);
+  const sidebar = app.querySelector('.sidebar');
+  sidebar.id = 'table-drawer';
+  sidebar.classList.toggle('drawer-open', roomPanel === 'chat');
+  sidebar.setAttribute('aria-label', 'Table chat');
+  sidebar.querySelector('.side-heading').insertAdjacentHTML('beforeend', '<button class="icon-button" data-action="close-panel" aria-label="Close table chat">×</button>');
+  table.insertAdjacentHTML('beforeend', `<section class="settings-drawer" ${roomPanel === 'settings' ? '' : 'hidden'} aria-label="Game settings"><div class="side-heading"><h2>Game settings</h2><button class="icon-button" data-action="close-panel" aria-label="Close settings">×</button></div><button data-action="info">Game information</button><button data-action="scores">Leaderboard</button><button data-action="rules">Rummy rules</button><button data-action="tutorial">Learn Rummy</button><button data-action="invite">Invite friends</button><button data-action="last-deal">Last deal</button></section>`);
+  const banner = document.querySelector('#connection-banner');
+  banner.hidden = !failures;
   const messageBox = document.querySelector('#messages'); if (messageBox) messageBox.scrollTop = messageBox.scrollHeight;
   if (focus === 'chat-input') { const input = document.querySelector('#chat-input'); input.focus(); input.setSelectionRange(selectionStart, selectionStart); }
   updateClock();
@@ -137,7 +160,7 @@ async function action(actionName, extra = {}) {
     } else if (result.left) { history.replaceState({}, '', '/'); landing(); }
     else { if (['discard', 'declare'].includes(actionName)) selected.clear(); accept(result); saveGroups(); }
     return true;
-  } catch (e) { toast(e.message, true); return false; }
+  } catch (e) { if (actionName === 'declare') showNotice('Try again', e.message); else toast(e.message, true); return false; }
   finally { busy = false; app.removeAttribute('aria-busy'); }
 }
 async function poll() {
@@ -146,9 +169,10 @@ async function poll() {
   try {
     const result = await request(`/api/room?code=${state.code}`);
     if (result.code !== state?.code) return;
-    failures = 0; accept(result);
+    failures = 0; document.querySelector('#connection-banner').hidden = true; accept(result);
     const indicator = document.querySelector('#connection'); if (indicator) { indicator.textContent = '● Connected'; indicator.classList.remove('offline'); }
   } catch (e) {
+    document.querySelector('#connection-banner').hidden = false;
     if (++failures === 2) toast('Connection interrupted. Reconnecting automatically…', true);
     const indicator = document.querySelector('#connection'); if (indicator) { indicator.textContent = '● Reconnecting'; indicator.classList.add('offline'); }
     if (e.status === 404) { history.replaceState({}, '', '/'); landing(); toast(e.message, true); }
@@ -166,6 +190,13 @@ app.addEventListener('click', async event => {
   if (target.dataset.remove) return action('removeBot', { playerId: target.dataset.remove });
   if (target.dataset.draw) return action('draw', { source: target.dataset.draw });
   switch (target.dataset.action) {
+    case 'refresh': await poll(); break;
+    case 'chat': case 'settings': roomPanel = roomPanel === target.dataset.action ? '' : target.dataset.action; renderRoom(); if (roomPanel === 'chat') document.querySelector('#chat-input')?.focus(); break;
+    case 'close-panel': roomPanel = ''; renderRoom(); break;
+    case 'info': showGameInfo(); break;
+    case 'scores': showScores(); break;
+    case 'last-deal': showScores(true); break;
+    case 'tutorial': tutorialStep = 0; showTutorial(); break;
     case 'invite': {
       document.querySelector('#invite-url').value = `${location.origin}/?room=${state.code}`;
       document.querySelector('#invite-dialog').showModal(); break;
@@ -252,6 +283,48 @@ document.querySelector('#copy-invite').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(input.value); toast('Invite copied. Send it to your people.'); }
   catch { input.focus(); input.select(); toast('Select and copy this link to share it.'); }
 });
+function openGameDialog(title, html) {
+  const dialog = document.querySelector('#game-dialog');
+  document.querySelector('#game-dialog-label').textContent = title;
+  document.querySelector('#game-dialog-content').innerHTML = html;
+  if (!dialog.open) dialog.showModal();
+}
+function showNotice(title, text) {
+  openGameDialog(title, `<h2>${esc(title)}</h2><p>${esc(text)}</p><button class="button primary full" data-close="game-dialog">Back to my hand</button>`);
+}
+function showGameInfo() {
+  if (!state) return;
+  openGameDialog('Game information', `<h2>Your private table</h2><div class="info-grid"><div><small>Room</small><strong>${esc(state.code)}</strong></div><div><small>Round</small><strong>${state.round || 'Not started'}</strong></div><div><small>Players</small><strong>${state.players.length} / 6</strong></div><div><small>Game</small><strong>13-card Indian Rummy</strong></div></div><p style="margin-top:20px">Two decks. Two sequences, including one pure sequence. Draw one card, then discard one. Maximum round penalty: 80 points.</p><p>Free play points only. No entry fee or cash value.</p><button class="button primary full" data-close="game-dialog">Back to the table</button>`);
+}
+function showScores(lastDeal = false) {
+  if (!state) return;
+  const round = lastDeal ? state.history[0] : null;
+  const scores = round?.scores || (state.result?.scores ?? state.players);
+  openGameDialog(lastDeal ? 'Last deal' : 'Leaderboard', `<h2>${lastDeal ? round ? `Round ${round.round}` : 'No completed deals yet' : 'Table leaderboard'}</h2><p>Lower penalty totals are better.${round ? ` Winner: ${esc(round.winner)}.` : ''}</p><div class="score-table-wrap"><table class="score-table"><thead><tr><th>Player</th><th>Round</th><th>Total</th></tr></thead><tbody>${[...scores].sort((a,b) => a.total - b.total).map(p => `<tr class="${p.id === state.result?.winner ? 'winner-row' : ''}"><td>${esc(p.name)}</td><td>${p.penalty || 0}</td><td>${p.total || 0}</td></tr>`).join('')}</tbody></table></div><button class="button primary full" data-close="game-dialog">Continue</button>`);
+}
+const tutorial = [
+  { title: 'Get ready to learn Rummy!', text: 'Start with 13 cards. Arrange your hand into sequences and sets. Each turn, draw one card and discard one.' },
+  { title: 'Pure sequence', text: 'Three or more consecutive cards of the same suit. You need at least one pure sequence to win.', good: [[1,'C'],[2,'C'],[3,'C']], bad: [[13,'D'],[5,'H'],[11,'S']] },
+  { title: 'Impure sequence', text: 'Use a printed or wild joker to replace a missing card in a sequence. The other cards must belong to the same suit.', good: [[1,'D'],[2,'D'],[0,'J']], bad: [[1,'C'],[2,'D'],[0,'J']] },
+  { title: 'Sets', text: 'Three or four cards of the same rank in different suits. A joker may replace a card. Repeated suits make the set invalid.', good: [[3,'C'],[3,'D'],[3,'S']], bad: [[2,'C'],[2,'D'],[2,'D']] },
+  { title: 'Card points', text: 'A, K, Q and J count as 10 points. Number cards count their face value. Printed and wild jokers count as 0. Your round penalty is capped at 80.', good: [[1,'C'],[10,'S'],[11,'D'],[12,'D'],[13,'D']] },
+  { title: 'Ready for your first deal?', text: 'Make at least two sequences, including one pure sequence. Your remaining cards must form valid sets or sequences. After drawing, select one final discard and Declare. The server checks the remaining 13 cards.' },
+];
+function showTutorial() {
+  const step = tutorial[tutorialStep];
+  const hand = (cards, valid) => `<div class="tutorial-example"><div class="cards">${cards.map(([rank,suit],i) => card({ id:`tutorial-${i}`, rank,suit })).join('')}</div>${step.bad ? `<span class="tutorial-verdict ${valid ? 'valid' : 'invalid'}">${valid ? '✓ Valid' : '× Invalid'}</span>` : ''}</div>`;
+  openGameDialog('Learn Rummy', `<div class="tutorial-progress" aria-label="Step ${tutorialStep + 1} of ${tutorial.length}">${tutorial.map((_,i) => `<span class="${i <= tutorialStep ? 'current' : ''}"></span>`).join('')}</div><div class="tutorial-table"><h2>${step.title}</h2><p>${step.text}</p>${step.good ? `<div class="tutorial-examples">${hand(step.good,true)}${step.bad ? hand(step.bad,false) : ''}</div>` : ''}</div><div class="tutorial-actions"><button class="button secondary" data-tutorial="back" ${tutorialStep === 0 ? 'disabled' : ''}>‹ Back</button><button class="button primary" data-tutorial="next">${tutorialStep === tutorial.length - 1 ? 'Let’s play' : 'Next ›'}</button></div>`);
+}
+document.querySelector('#game-dialog').addEventListener('click', event => {
+  const target = event.target.closest('[data-tutorial]'); if (!target) return;
+  if (target.dataset.tutorial === 'back') tutorialStep = Math.max(0,tutorialStep - 1);
+  else if (tutorialStep === tutorial.length - 1) { document.querySelector('#game-dialog').close(); return; }
+  else tutorialStep++;
+  showTutorial();
+});
+document.querySelector('#reconnect-button').addEventListener('click', () => poll());
+document.addEventListener('keydown', event => { if (event.key === 'Escape' && roomPanel) { roomPanel = ''; if (state) renderRoom(); } });
+
 async function boot() {
   try {
     session = await request('/api/session');
