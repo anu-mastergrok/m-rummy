@@ -15,6 +15,7 @@ const chatReplies = ['Hello everyone!', 'Good luck!', 'Nice hand!', 'Well played
 const chatEmojis = [['😀', 'Grinning face'], ['😄', 'Smiling face'], ['😂', 'Laughing with tears'], ['🙂', 'Slight smile'], ['👍', 'Thumbs up'], ['👏', 'Applause'], ['🎉', 'Celebration'], ['❤️', 'Heart']];
 let tutorialIndex = 0;
 let preferences = {};
+let preferenceSaveMessage = 'Changes are saved automatically on this browser.', panelFromSettings = false;
 try { preferences = JSON.parse(localStorage.getItem('mr-preferences') || '{}') || {}; if (typeof preferences !== 'object' || Array.isArray(preferences)) preferences = {}; } catch { /* Optional preferences. */ }
 function applyPreferences() {
   document.documentElement.classList.toggle('roomy-cards', preferences.roomyCards === true);
@@ -291,9 +292,9 @@ function renderTutorial() {
   document.querySelector('#tutorial-back').disabled = tutorialIndex === 0;
   document.querySelector('#tutorial-next').textContent = tutorialIndex === tutorialSteps.length - 1 ? 'Finish tutorial' : 'Next →';
 }
-function showGamePanel(panel) {
+function showGamePanel(panel, fromSettings = false) {
   if (!state) return;
-  openGamePanel = panel;
+  openGamePanel = panel; panelFromSettings = fromSettings;
   if (panel === 'chat') chatComposerMode = 'replies';
   document.querySelector('#game-panel-content').innerHTML = ''; renderGamePanel();
   const dialog = document.querySelector('#game-dialog');
@@ -302,9 +303,15 @@ function showGamePanel(panel) {
 }
 function renderGamePanel() {
   if (!openGamePanel || !state) return;
-  const titles = { chat: 'Table talk', hand: 'Your cards', standings: 'Table standings', information: 'About this table', settings: 'Your display settings', declaration: 'Review your declaration' };
+  const titles = { chat: 'Table talk', hand: 'Your cards', standings: 'Table standings', information: 'About this table', settings: 'Your display settings', lastDeal: 'Last completed deal', declaration: 'Review your declaration' };
   const content = document.querySelector('#game-panel-content');
-  if (openGamePanel === 'settings' && content.querySelector('[data-preference]')) return;
+  const lastDeal = state.history?.[0];
+  const hasLastDeal = Array.isArray(lastDeal?.scores) && lastDeal.scores.length > 0;
+  if (openGamePanel === 'settings' && content.querySelector('[data-preference]')) {
+    content.querySelector('[data-settings-panel=lastDeal]').disabled = !hasLastDeal;
+    content.querySelector('#settings-last-deal-help').textContent = hasLastDeal ? 'View the last completed round.' : 'Available after the first completed round.';
+    return;
+  }
   const focused = document.activeElement?.id;
   const cursor = document.activeElement?.selectionStart;
   const cursorEnd = document.activeElement?.selectionEnd;
@@ -314,7 +321,7 @@ function renderGamePanel() {
   const dialog = document.querySelector('#game-dialog');
   dialog.dataset.panel = openGamePanel;
   dialog.classList.toggle('declaration-notice', openGamePanel === 'declaration');
-  dialog.querySelector('.dialog-head [data-close]').innerHTML = openGamePanel === 'chat' ? '<img src="/assets/figma/chat-back.svg" alt="">' : '×';
+  dialog.querySelector('.dialog-head [data-close]').innerHTML = ['chat', 'settings', 'lastDeal'].includes(openGamePanel) ? '<img src="/assets/figma/chat-back.svg" alt="">' : '×';
   document.querySelector('#game-panel-title').textContent = titles[openGamePanel];
   if (openGamePanel === 'chat') {
     content.innerHTML = `<p class="chat-scope">ROOM ${esc(state.code)} · ${state.players.length}/6 seated</p><div class="messages" id="dialog-messages" role="region" tabindex="0" aria-label="Table message history">${state.messages.length ? state.messages.map(m => `<article class="message"><span>${esc(m.name)} <time>${new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></span><p>${esc(m.text)}</p></article>`).join('') : '<div class="chat-empty"><strong>Your table, your conversation.</strong><p>Say hello or choose a quick reply below.</p></div>'}</div><div class="chat-suggestions"><div class="chat-suggestion-heading"><h3>${chatComposerMode === 'emojis' ? 'Emoji' : 'Quick replies'}</h3>${chatComposerMode === 'emojis' ? '<button type="button" class="text-button" id="chat-show-replies" data-chat-mode="replies">Quick replies</button>' : '<span>Tap to add to your draft</span>'}</div><div class="${chatComposerMode === 'emojis' ? 'chat-emoji-grid' : 'chat-quick-replies'}">${chatComposerMode === 'emojis' ? chatEmojis.map(([emoji, name], i) => `<button type="button" id="chat-emoji-${i}" data-chat-emoji="${i}" aria-label="Insert ${esc(name.toLowerCase())}">${emoji}</button>`).join('') : chatReplies.map((text, i) => `<button type="button" id="chat-reply-${i}" data-chat-reply="${i}">${esc(text)}</button>`).join('')}</div></div><form class="chat-form" id="dialog-chat-form"><button type="button" class="chat-emoji-toggle" id="chat-emoji-toggle" data-chat-mode="${chatComposerMode === 'emojis' ? 'replies' : 'emojis'}" aria-label="Choose emoji" aria-pressed="${chatComposerMode === 'emojis'}"><img src="/assets/figma/chat-emoji.svg" alt=""></button><label class="sr-only" for="dialog-chat-input">Message your table</label><input id="dialog-chat-input" aria-describedby="dialog-chat-status" maxlength="240" required autocomplete="off" placeholder="Your message" value="${esc(chatDraft)}"><button type="submit" id="dialog-chat-send" aria-label="Send message" ${busy || connection !== 'connected' || !chatDraft.trim() ? 'disabled' : ''}><img src="/assets/figma/chat-send.svg" alt=""></button></form><div class="chat-compose-status"><p id="dialog-chat-status" role="status">${connection !== 'connected' ? 'Reconnecting. Your draft is kept until you can send.' : busy ? 'Sending your action…' : 'Only players at this table can read these messages.'}</p><span id="dialog-chat-count" aria-label="Message length">${chatDraft.length}/240</span></div>`;
@@ -329,10 +336,13 @@ function renderGamePanel() {
   } else if (openGamePanel === 'information') {
     content.innerHTML = `<dl class="table-facts"><dt>Room</dt><dd>${esc(state.code)}</dd><dt>Game</dt><dd>13-card Indian rummy · Two packs</dd><dt>Players</dt><dd>${state.players.length} / 6</dd><dt>Round</dt><dd>${state.round || 'Not started'}</dd><dt>Status</dt><dd>${esc(state.status)}</dd><dt>Privacy</dt><dd>Invite only${state.hasPassword ? ' · Password protected' : ''}</dd><dt>Stakes</dt><dd>Free play · No money involved</dd><dt>Human turns</dt><dd>60 seconds · Server timed</dd></dl><p>Form at least two sequences including one pure sequence, and valid groups throughout. Invalid declarations leave your hand and turn open. Connection badges are status hints; timers keep running while a player is away or not responding. First drop: 20 penalty points; later drop: 40. Round penalty is capped at 80.</p>`;
   } else if (openGamePanel === 'settings') {
-    content.innerHTML = `<p>Display preferences are saved on this browser.</p><label class="preference"><input type="checkbox" data-preference="roomyCards" ${preferences.roomyCards ? 'checked' : ''}><span>Spread out hand cards<small>Less overlap; scroll sideways to see the full hand.</small></span></label><label class="preference"><input type="checkbox" data-preference="quietMotion" ${preferences.quietMotion ? 'checked' : ''}><span>Reduce motion<small>Your device’s reduced-motion preference is also respected.</small></span></label>`;
+    content.innerHTML = `<p class="settings-intro">Make the table comfortable for you.</p><div class="settings-options"><button type="button" class="settings-option" data-settings-panel="information"><span class="settings-option-icon" aria-hidden="true"><img src="/assets/figma/settings-info.svg" alt=""></span><span><strong>Info</strong><small>Rules, room details and turn timing</small></span><span class="settings-option-action" aria-hidden="true">↗</span></button><div class="settings-option settings-option-unavailable"><span class="settings-option-icon" aria-hidden="true"><img src="/assets/figma/settings-music.svg" alt=""></span><span><strong>Game Music</strong><small>Music playback is not available yet.</small></span><span class="settings-unavailable-label">Unavailable</span></div><button type="button" class="settings-option" data-settings-panel="lastDeal" aria-describedby="settings-last-deal-help" ${!hasLastDeal ? 'disabled' : ''}><span class="settings-option-icon" aria-hidden="true"><img src="/assets/figma/settings-cards.svg" alt=""></span><span><strong>Last Deal</strong><small id="settings-last-deal-help">${hasLastDeal ? 'View the last completed round.' : 'Available after the first completed round.'}</small></span><span class="settings-option-action" aria-hidden="true">↗</span></button></div><fieldset class="settings-preferences"><legend>Display preferences</legend><label class="preference settings-preference"><span><strong>Spread out hand cards</strong><small>Less overlap; scroll sideways to see the full hand.</small></span><input type="checkbox" data-preference="roomyCards" aria-label="Spread out hand cards" ${preferences.roomyCards ? 'checked' : ''}></label><label class="preference settings-preference"><span><strong>Reduce motion</strong><small>Your device’s reduced-motion preference is also respected.</small></span><input type="checkbox" data-preference="quietMotion" aria-label="Reduce motion" ${preferences.quietMotion ? 'checked' : ''}></label></fieldset><p id="settings-save-status" role="status">${esc(preferenceSaveMessage)}</p>`;
+  } else if (openGamePanel === 'lastDeal') {
+    content.innerHTML = hasLastDeal ? `<p class="last-deal-summary">Round ${number(lastDeal.round)}<strong>${esc(lastDeal.winner)} won</strong></p><div class="score-table-wrap"><table class="score-table"><caption class="sr-only">Last completed round penalties</caption><thead><tr><th scope="col">Player</th><th scope="col">Round penalty</th><th scope="col">Total penalty</th></tr></thead><tbody>${lastDeal.scores.map(p => `<tr><th scope="row">${esc(p.name)}</th><td>${number(p.penalty)}</td><td>${number(p.total)}</td></tr>`).join('')}</tbody></table></div><p class="last-deal-note">These are the server-recorded results of the last completed round at this table.</p>` : '<p class="last-deal-note">No completed round is available yet.</p>';
   } else if (openGamePanel === 'declaration') {
     content.innerHTML = `<p class="declaration-feedback">${esc(declarationError)}</p><p>Check for two sequences, at least one pure, and valid groups covering your other 13 cards. No penalty was applied to the rejected declaration. The server timer continues.</p><div class="button-row"><button class="button primary" data-close="game-dialog">Review my hand</button><button class="button secondary" data-panel-action="arrange" ${busy || connection !== 'connected' ? 'disabled' : ''}>Auto-group</button></div>`;
   }
+  if (panelFromSettings && ['information', 'lastDeal'].includes(openGamePanel)) content.insertAdjacentHTML('beforeend', '<button type="button" class="button secondary settings-back" data-settings-panel="settings">Back to settings</button>');
   if (focused === 'dialog-chat-input') {
     const input = content.querySelector('#dialog-chat-input');
     input?.focus({ preventScroll: true }); input?.setSelectionRange(cursor, cursorEnd ?? cursor);
@@ -487,11 +497,22 @@ document.querySelector('#game-dialog').addEventListener('change', event => {
   const key = event.target.dataset.preference;
   if (!['roomyCards', 'quietMotion'].includes(key)) return;
   preferences[key] = event.target.checked; applyPreferences();
-  try { localStorage.setItem('mr-preferences', JSON.stringify(preferences)); } catch { toast('Applied for this visit. Browser storage is unavailable.'); }
+  try {
+    localStorage.setItem('mr-preferences', JSON.stringify(preferences));
+    preferenceSaveMessage = 'Saved on this browser.';
+  } catch {
+    preferenceSaveMessage = 'Applied for this visit. Browser storage is unavailable.';
+    toast(preferenceSaveMessage);
+  }
+  const status = document.querySelector('#settings-save-status');
+  if (status) status.textContent = preferenceSaveMessage;
 });
 document.querySelector('#game-dialog').addEventListener('click', event => {
   const target = event.target.closest('button');
   if (!target || target.disabled) return;
+  if (['information', 'lastDeal', 'settings'].includes(target.dataset.settingsPanel)) {
+    showGamePanel(target.dataset.settingsPanel, target.dataset.settingsPanel !== 'settings'); return;
+  }
   if (target.dataset.chatMode) {
     const input = document.querySelector('#dialog-chat-input');
     const start = input.selectionStart, end = input.selectionEnd;

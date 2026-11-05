@@ -506,6 +506,24 @@
       "node": "11:82773",
       "method": "Original vector paths with instance-derived dimensions/transforms; referenced local fill style and explicit overrides resolved",
       "sha256": "6b6bb7b15a289f068aeab3f88f2b7025a55c2f93b069614f1288da0aa7f709b1"
+    },
+    {
+      "path": "public/assets/figma/settings-info.svg",
+      "node": "11:82797",
+      "method": "Original vector paths and paints with instance-derived 40px geometry/transforms",
+      "sha256": "4b7f6fd06d2259816373c7c87dd15a128eed1903766123fbb96c14115e69c4e7"
+    },
+    {
+      "path": "public/assets/figma/settings-music.svg",
+      "node": "11:82791",
+      "method": "Original vector paths and paints with instance-derived 40px geometry/transforms",
+      "sha256": "5fd3abf24f6e0b7742ec179406d5ecf31b1f0f8b3b7fb36c6006d2cce20e6661"
+    },
+    {
+      "path": "public/assets/figma/settings-cards.svg",
+      "node": "11:82803",
+      "method": "Original vector paths and paints with instance-derived 40px geometry/transforms",
+      "sha256": "bdc2d73c248159d2025bedfddab6ccd0bdcfa68a4418e9cafa35c564c6a3a8fa"
     }
   ],
   "screens": [
@@ -751,6 +769,24 @@
       "Source emoji keyboard image is represented by eight accessible native emoji buttons; platform rendering varies",
       "Native dialog remains modal, styled as a responsive right-side drawer",
       "SF Pro Display is not bundled; platform fallback used"
+    ]
+  },
+  "settingsScreen": {
+    "frame": "11:83159",
+    "component": "11:82783",
+    "backgroundNode": "11:82784",
+    "background": "#083827",
+    "iconSurface": "#d4f0e6",
+    "text": "#f2f5f2",
+    "activeText": "#60c464",
+    "backAsset": "public/assets/figma/chat-back.svg",
+    "backNode": "11:83320",
+    "adaptations": [
+      "Source back icon exactly matches the bundled chat-back.svg",
+      "Info opens existing table information; Last Deal uses only public server history scores",
+      "Music is displayed as unavailable because there is no audio system",
+      "Existing roomy-cards and reduced-motion preferences remain with accessible native checkbox switches",
+      "Larger responsive menu accommodates live descriptions and display preferences; source fonts use platform fallback"
     ]
   }
 }

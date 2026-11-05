@@ -269,3 +269,45 @@ body:has(.gameplay-page) #profile-button small{color:#c3c1dc}
 #game-dialog[data-panel=chat] :is(button,input,[tabindex]):focus-visible{outline:3px solid #5fffc7;outline-offset:2px}
 @media(max-width:600px){#game-dialog[data-panel=chat]{inset:12px 12px auto auto;transform:none;margin:0;width:calc(100vw - 24px);height:calc(100dvh - 24px);max-height:calc(100dvh - 24px);border-radius:18px;padding:18px 16px}#game-dialog[data-panel=chat] h2{font-size:26px}#game-dialog[data-panel=chat] #game-panel-content{gap:12px}#game-dialog[data-panel=chat] .messages{padding:10px 8px}#game-dialog[data-panel=chat] .message{padding:8px 10px}.chat-quick-replies button{font-size:11px;padding:8px 10px}.chat-suggestion-heading>span{font-size:9px}.chat-compose-status{gap:8px}#game-dialog[data-panel=chat] #dialog-chat-status{font-size:10px}#game-dialog[data-panel=chat] .chat-form{gap:4px;padding:6px}#game-dialog[data-panel=chat] .chat-form input{font-size:16px}}
 @media(max-height:600px){#game-dialog[data-panel=chat]{padding:12px 16px}#game-dialog[data-panel=chat] .dialog-head{margin-bottom:6px}#game-dialog[data-panel=chat] h2{font-size:23px}#game-dialog[data-panel=chat] #game-panel-content{gap:8px}#game-dialog[data-panel=chat] .messages{min-height:70px}.chat-quick-replies{grid-template-columns:repeat(3,minmax(0,1fr))}.chat-quick-replies button{padding:6px;font-size:11px}.chat-suggestion-heading{margin-bottom:4px}.chat-emoji-grid{grid-template-columns:repeat(8,minmax(0,1fr));gap:4px}.chat-emoji-grid button{padding:6px 2px;font-size:22px;min-height:40px}}
+
+/* Settings menu: local Info Layout 11:82783, frame 11:83159. */
+#game-dialog:is([data-panel=settings],[data-panel=lastDeal]){width:min(520px,calc(100vw - 32px));max-width:none;padding:26px;border:2px solid #f2f5f2;border-radius:24px;background:#083827;color:#f2f5f2;font-family:'SF Pro Display',-apple-system,BlinkMacSystemFont,var(--sans)}
+#game-dialog:is([data-panel=settings],[data-panel=lastDeal]) .dialog-head{margin-bottom:16px}
+#game-dialog:is([data-panel=settings],[data-panel=lastDeal]) .eyebrow{color:#d4f0e6}
+#game-dialog:is([data-panel=settings],[data-panel=lastDeal]) .dialog-head .icon-button{display:grid;place-items:center;width:48px;height:48px;background:#ffffff14;border:1px solid #ffffff50;border-radius:12px}
+#game-dialog:is([data-panel=settings],[data-panel=lastDeal]) img{display:block}
+#game-dialog:is([data-panel=settings],[data-panel=lastDeal]) h2{font:500 28px/1.25 'SF Pro Display',-apple-system,BlinkMacSystemFont,var(--sans);color:#f2f5f2;letter-spacing:-.4px;margin-bottom:12px}
+#game-dialog[data-panel=settings] .settings-intro{font-size:13px;line-height:1.7;color:#d4f0e6;margin-bottom:20px}
+.settings-options{display:grid;gap:10px}
+.settings-option{display:flex;align-items:center;gap:16px;width:100%;border:1px solid #ffffff30;border-radius:16px;background:#ffffff08;color:#f2f5f2;padding:14px;text-align:left;min-width:0}
+.settings-option>span:not(.settings-option-icon):not(.settings-option-action):not(.settings-unavailable-label){min-width:0;flex:1}
+.settings-option strong{display:block;font-size:17px;font-weight:500;line-height:1.4}
+.settings-option small{display:block;font-size:11px;line-height:1.7;margin-top:4px;color:#d4f0e6}
+.settings-option-icon{display:grid;place-items:center;flex:0 0 64px;width:64px;height:64px;background:#d4f0e6;border-radius:50%}
+.settings-option-action{font-size:20px;color:#d4f0e6;flex-shrink:0}
+button.settings-option:not(:disabled):hover{background:#ffffff18;border-color:#d4f0e6}
+button.settings-option:disabled{opacity:1;color:#c1d4cb;border-color:#ffffff20;background:#ffffff05}
+button.settings-option:disabled .settings-option-icon{opacity:.55}
+.settings-option-unavailable{flex-wrap:wrap;background:#0000000d}
+.settings-unavailable-label{font-size:9px;line-height:1.5;border:1px solid #acc6b7;color:#d4f0e6;border-radius:16px;padding:4px 8px}
+.settings-preferences{margin:24px 0 0;padding:0;border:0;min-width:0}
+.settings-preferences legend{font-size:11px;line-height:1.5;letter-spacing:1px;text-transform:uppercase;color:#d4f0e6;padding:0 0 8px}
+#game-dialog[data-panel=settings] .settings-preference{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:16px 0;margin:0;border-top:1px solid #ffffff30;font-size:13px}
+.settings-preference>span{min-width:0;flex:1;color:#f2f5f2}
+.settings-preference strong{font-size:14px;font-weight:500;line-height:1.5}
+#game-dialog[data-panel=settings] .settings-preference small{color:#d4f0e6;font-size:11px;line-height:1.7}
+.settings-preference input{appearance:none;-webkit-appearance:none;position:relative;flex:0 0 48px;width:48px;height:28px;border:1px solid #c5d7cd;border-radius:20px;background:#324e43;padding:0;margin:0;cursor:pointer;transition:background .15s}
+.settings-preference input::before{content:'';position:absolute;left:4px;top:4px;width:18px;height:18px;border-radius:50%;background:#f2f5f2;transition:transform .15s}
+.settings-preference input:checked{background:#60c464;border-color:#9bea9e}
+.settings-preference input:checked::before{transform:translateX(20px);background:#06301e}
+#game-dialog[data-panel=settings] #settings-save-status{border-top:1px solid #ffffff30;margin:0;padding-top:16px;font-size:11px;line-height:1.7;color:#d4f0e6}
+#game-dialog:is([data-panel=settings],[data-panel=lastDeal]) :is(button,input):focus-visible{outline:3px solid #b5ffd8;outline-offset:3px}
+#game-dialog[data-panel=lastDeal] .last-deal-summary{font-size:12px;color:#d4f0e6;margin-bottom:20px}
+.last-deal-summary strong{display:block;font-size:22px;line-height:1.5;color:#f2f5f2;font-weight:500;overflow-wrap:anywhere;margin-top:6px}
+#game-dialog[data-panel=lastDeal] .score-table{color:#f2f5f2;font-size:12px}
+#game-dialog[data-panel=lastDeal] .score-table :is(th,td){border-color:#ffffff30;color:inherit;overflow-wrap:anywhere}
+#game-dialog[data-panel=lastDeal] .score-table tbody th{font-weight:500;border-top:1px solid #ffffff30;padding:12px 8px;text-align:left;font-size:12px}
+#game-dialog[data-panel=lastDeal] .last-deal-note{font-size:11px;line-height:1.8;color:#d4f0e6}
+#game-dialog[data-panel=lastDeal] .settings-back{background:#d4f0e6;color:#083827;border-color:#d4f0e6;min-height:44px;margin-top:12px}
+@media(max-width:600px){#game-dialog:is([data-panel=settings],[data-panel=lastDeal]){padding:20px 16px;width:calc(100vw - 24px);max-height:calc(100dvh - 24px);border-radius:18px}#game-dialog:is([data-panel=settings],[data-panel=lastDeal]) h2{font-size:25px}.settings-option{padding:12px;gap:12px}.settings-option strong{font-size:15px}.settings-option small{font-size:10px}.settings-unavailable-label{margin-left:76px}.settings-option-icon{flex-basis:64px}.settings-preferences{margin-top:20px}.settings-preference input{min-height:28px}#game-dialog[data-panel=lastDeal] .score-table{font-size:11px}}
+@media(forced-colors:active){.settings-preference input{appearance:auto;-webkit-appearance:auto}.settings-preference input::before{display:none}}

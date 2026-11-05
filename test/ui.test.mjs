@@ -612,3 +612,89 @@ test('rejected and pending chat sends retain drafts and do not send twice', asyn
   assert.equal(room.messages.length, 1); assert.equal(room.messages[0].text, 'Retry this draft');
   assert.equal(requests.length, 2); assert.deepEqual(f.errors, []);
 });
+
+for (const [width, height] of [[390, 844], [768, 1024], [1024, 768], [1920, 1080]]) {
+  test(`source settings fit ${width}px and display preferences persist after reload`, async t => {
+    const f = await fixture(t, { width, height }); const { page } = f;
+    await open(page, 'Settings');
+    await page.locator('#game-dialog img').evaluateAll(images => Promise.all(images.map(image => image.decode())));
+    assert.equal(await page.locator('[data-settings-panel="lastDeal"]').isDisabled(), true);
+    assert.equal(await page.getByRole('checkbox').count(), 2);
+    assert.match(await page.locator('.settings-option-unavailable').innerText(), /Game Music.*not available/s);
+    for (const asset of ['settings-info', 'settings-music', 'settings-cards']) {
+      const box = await page.locator(`#game-dialog img[src$="${asset}.svg"]`).boundingBox();
+      assert.equal(box.width, 40); assert.equal(box.height, 40);
+    }
+    const back = await page.locator('#game-dialog img[src$="chat-back.svg"]').boundingBox();
+    assert.equal(back.width, 36); assert.equal(back.height, 36);
+    assert.equal(await page.locator('#game-dialog').evaluate(el => el.scrollWidth <= el.clientWidth), true);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    if (process.env.UI_SCREENSHOT_DIR) {
+      await mkdir(process.env.UI_SCREENSHOT_DIR, { recursive: true });
+      await page.screenshot({ path: resolve(process.env.UI_SCREENSHOT_DIR, `settings-${width}.png`), fullPage: true });
+    }
+    await page.getByLabel('Spread out hand cards', { exact: true }).check();
+    await page.getByLabel('Reduce motion', { exact: true }).check();
+    assert.match(await page.locator('#settings-save-status').innerText(), /Saved on this browser/);
+    assert.equal(await page.locator('html').evaluate(el => el.classList.contains('roomy-cards') && el.classList.contains('quiet-motion')), true);
+    await page.keyboard.press('Escape'); await page.reload(); await page.locator('#connection').waitFor();
+    await open(page, 'Settings');
+    assert.equal(await page.getByLabel('Spread out hand cards', { exact: true }).isChecked(), true);
+    assert.equal(await page.getByLabel('Reduce motion', { exact: true }).isChecked(), true);
+    assert.equal(f.requests.length, 0); assert.deepEqual(f.errors, []);
+  });
+}
+
+test('settings remain usable offline and a completed round unlocks last deal without replacing focused preferences', async t => {
+  const f = await fixture(t); const { page, room } = f;
+  await open(page, 'Settings');
+  const preference = page.getByLabel('Reduce motion', { exact: true }); await preference.focus();
+  const element = await preference.elementHandle();
+  room.history = [{ round: 1, winner: '<img src=x onerror=alert(1)>', scores: [{ name: '<script>Friend</script>', penalty: 0, total: 20 }, { name: 'Me', penalty: 40, total: 60 }] }]; room.version++;
+  await page.waitForFunction(() => !document.querySelector('[data-settings-panel="lastDeal"]').disabled);
+  assert.equal(await element.evaluate(el => el === document.activeElement), true);
+  await page.locator('[data-settings-panel="lastDeal"]').click();
+  assert.match(await page.locator('.last-deal-summary').innerText(), /<img src=x/);
+  assert.equal(await page.locator('#game-dialog .card, #game-dialog script').count(), 0);
+  assert.equal(await page.locator('#game-dialog img').count(), 1);
+  assert.equal(await page.locator('#game-dialog tbody tr').count(), 2);
+  if (process.env.UI_SCREENSHOT_DIR) {
+    await mkdir(process.env.UI_SCREENSHOT_DIR, { recursive: true });
+    await page.screenshot({ path: resolve(process.env.UI_SCREENSHOT_DIR, 'settings-last-deal-desktop.png'), fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: resolve(process.env.UI_SCREENSHOT_DIR, 'settings-last-deal-mobile.png'), fullPage: true });
+    await page.setViewportSize({ width: 1920, height: 1080 });
+  }
+  await page.getByRole('button', { name: 'Back to settings', exact: true }).click();
+  await page.locator('[data-settings-panel="information"]').click();
+  assert.match(await page.locator('#game-dialog').innerText(), /60 seconds/);
+  await page.getByRole('button', { name: 'Back to settings', exact: true }).click();
+  f.setOffline(true); await page.evaluate(() => window.dispatchEvent(new Event('offline')));
+  await page.getByLabel('Reduce motion', { exact: true }).check();
+  assert.equal(await page.getByLabel('Reduce motion', { exact: true }).isChecked(), true);
+  assert.equal(f.requests.length, 0);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('.connection-progress img').evaluate(el => getComputedStyle(el).animationName), 'none');
+  f.setOffline(false); await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await page.waitForFunction(() => document.querySelector('#connection-banner').hidden);
+  assert.deepEqual(f.errors, []);
+});
+
+test('settings explain unavailable browser storage and isolate styling from other panels', async t => {
+  const f = await fixture(t, { width: 390, height: 844 }); const { page } = f;
+  await page.evaluate(() => {
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = function(key, value) { if (key === 'mr-preferences') throw new DOMException('Blocked', 'QuotaExceededError'); return original.call(this, key, value); };
+  });
+  await open(page, 'Settings');
+  await page.getByLabel('Spread out hand cards', { exact: true }).check();
+  assert.match(await page.locator('#settings-save-status').innerText(), /Applied for this visit.*unavailable/);
+  await page.keyboard.press('Escape'); await open(page, 'Settings');
+  assert.equal(await page.getByLabel('Spread out hand cards', { exact: true }).isChecked(), true);
+  assert.match(await page.locator('#settings-save-status').innerText(), /Applied for this visit/);
+  await page.keyboard.press('Escape'); await open(page, 'Chat');
+  assert.equal(await page.locator('#game-dialog').getAttribute('data-panel'), 'chat');
+  assert.equal(await page.locator('.settings-options').count(), 0);
+  await page.keyboard.press('Escape');
+  assert.equal(f.requests.length, 0); assert.deepEqual(f.errors, []);
+});
