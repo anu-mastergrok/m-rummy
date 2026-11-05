@@ -26,3 +26,16 @@ private, free-play engine. This is not a claim of exact Figma visual fidelity.
    Apache route and local module-serving fix.
 2. Client table switcher, add/create/join flow, table-local UI state and recovery.
 3. Browser/integration regression, responsive/keyboard verification and release checks.
+
+## Progress
+
+The backend milestone passed the full workflow, including four new PHP multi-table
+tests, HTTP route/module checks and the existing nine browser regressions:
+https://github.com/mastergrok-technologies/m-rummy/actions/runs/42029660673
+
+The client now renders a scrollable table rail with waiting, playing, own-turn,
+watching and finished statuses. Card groups/selections and chat drafts are scoped
+to table/round. Switching retrieves a new authorized snapshot and is blocked while
+a command is pending. Adding a table uses a modal create/join form; leaving or
+expiration opens a table picker instead of silently choosing another active game.
+The selected table is recovered from the URL/browser hint when still joined.

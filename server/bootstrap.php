@@ -31,9 +31,10 @@ function rummy_tables_view(array &$store, string $id, string $selected = ''): ar
             'status' => $room['status'], 'phase' => $room['phase'], 'deadline' => $room['deadline'],
             'yourTurn' => $room['status'] === 'playing' && !$me['dropped'] && $room['players'][$room['turn']]['id'] === $id,
             'dropped' => $me['dropped'], 'playerCount' => count($room['players'])];
-        if ($code === $selected) $active = rummy_room_view($store, $room, $id);
+        if ($code === $selected) $active = $code;
         unset($room);
     }
+    $active = $active !== null ? rummy_room_view($store, $store['rooms'][$active], $id) : null;
     return ['tables' => $tables, 'active' => $active, 'tableLimit' => RUMMY_TABLE_LIMIT, 'serverTime' => rummy_now()];
 }
 function rummy_session_cookie(string $token, array $session, array $config): void {
