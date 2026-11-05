@@ -71,3 +71,13 @@ viewport sizes; CI installs the pinned browser test dependency and runs them.
 Local syntax/helper tests pass. Local Chromium cannot launch because this execution
 environment disallows its socket; browser and PHP regression results are checked
 through GitHub Actions.
+
+### Milestone 4 validation
+
+Added a reusable six-step tutorial covering welcome, pure/impure sequences, sets,
+penalties and declaration rules. Static examples do not inherit live wild-card
+markings. Back/next/finish/revisit and optional completion storage are supported.
+CI's new keyboard checks exposed a dialog Tab-wrap escape; explicit Tab/Shift+Tab
+wrapping now complements native modal behavior. Added tutorial and round/stale
+snapshot regressions. Local JavaScript syntax and helper tests pass; final complete
+workflow results are recorded below after the pushed milestone is checked.

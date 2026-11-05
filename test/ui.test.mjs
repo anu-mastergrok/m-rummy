@@ -104,3 +104,37 @@ for (const [width, height] of [[390, 844], [768, 1024], [1024, 768], [1920, 1080
     assert.deepEqual(errors, []);
   });
 }
+
+test('six-step tutorial supports back, finish, revisit and keyboard close', async t => {
+  const { page, errors } = await fixture(t, { width: 390, height: 844 });
+  await open(page, 'Learn rummy');
+  assert.equal(await page.locator('#tutorial-back').isDisabled(), true);
+  for (let step = 1; step <= 6; step++) {
+    assert.equal(await page.locator('#tutorial-progress').textContent(), `Step ${step} of 6`);
+    if (step === 3) {
+      await page.locator('#tutorial-back').click();
+      assert.equal(await page.locator('#tutorial-progress').textContent(), 'Step 2 of 6');
+      await page.locator('#tutorial-next').click();
+    }
+    await page.locator('#tutorial-next').click();
+  }
+  assert.equal(await page.locator('#tutorial-dialog').evaluate(d => d.open), false);
+  assert.equal(await page.evaluate(() => localStorage.getItem('mr-tutorial-complete')), 'true');
+  await page.locator('#rules-button').click(); await page.locator('#tutorial-button').click();
+  assert.equal(await page.locator('#tutorial-progress').textContent(), 'Step 1 of 6');
+  await page.keyboard.press('Escape'); assert.equal(await page.locator('#tutorial-dialog').evaluate(d => d.open), false);
+  assert.deepEqual(errors, []);
+});
+
+test('round changes reset local groups and older snapshots cannot roll back the hand', async t => {
+  const { page, room } = await fixture(t);
+  await page.locator('[data-card="card-0"]').click(); await page.locator('[data-card="card-1"]').click(); await page.locator('[data-card="card-2"]').click();
+  await page.locator('[data-action="group"]').click(); assert.equal(await page.locator('.ungroup').count(), 1);
+  room.version++; room.round++;
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await page.waitForFunction(() => document.querySelectorAll('.ungroup').length === 0);
+  room.version = 0; room.hand = [];
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await page.waitForFunction(() => document.querySelector('#connection-banner').hidden);
+  assert.equal(await page.locator('.hand-scroll [data-card]').count(), 13);
+});

@@ -1,3 +1,4 @@
+import { tutorialSteps } from './tutorial.js';
 import { remainingSeconds, reconcileGroups, tableStandings } from './board-state.js';
 const app = document.querySelector('#app');
 const suits = { S: '♠', H: '♥', D: '♦', C: '♣', J: '✦' };
@@ -6,6 +7,7 @@ let session, state, busy = false, polling = false, failures = 0, mode = 'create'
 let lastCode = '', confirmAction;
 let connection = 'connected';
 let openGamePanel = null, declarationError = '';
+let tutorialIndex = 0;
 let preferences = {};
 try { preferences = JSON.parse(localStorage.getItem('mr-preferences') || '{}') || {}; if (typeof preferences !== 'object' || Array.isArray(preferences)) preferences = {}; } catch { /* Optional preferences. */ }
 function applyPreferences() {
@@ -19,7 +21,7 @@ let authMode = 'register', account = null, profileOffset = 0, authBusy = false;
 const number = value => Number(value || 0).toLocaleString('en-IN');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const label = c => `${ranks[c.rank] || c.rank} ${c.suit === 'J' ? 'printed joker' : ({ S: 'spades', H: 'hearts', D: 'diamonds', C: 'clubs' })[c.suit]}`;
-const card = (c, interactive = false, large = false) => `<${interactive ? 'button' : 'div'} class="card ${['H', 'D'].includes(c.suit) ? 'red' : ''} ${c.rank === 0 ? 'joker' : ''} ${large ? 'large-card' : ''} ${selected.has(c.id) && interactive ? 'selected' : ''}" ${interactive ? `type="button" data-card="${esc(c.id)}" aria-pressed="${selected.has(c.id)}" aria-label="${label(c)}${c.rank === state?.wildRank ? ', wild joker' : ''}"` : `aria-label="${label(c)}"`}><span class="card-corner">${ranks[c.rank] || c.rank}<small>${suits[c.suit]}</small></span><span class="card-suit" aria-hidden="true">${suits[c.suit]}</span><span class="card-corner bottom" aria-hidden="true">${ranks[c.rank] || c.rank}<small>${suits[c.suit]}</small></span>${c.rank === state?.wildRank && c.rank > 0 ? '<span class="wild-badge">WILD</span>' : ''}</${interactive ? 'button' : 'div'}>`;
+const card = (c, interactive = false, large = false, wildRank = state?.wildRank) => `<${interactive ? 'button' : 'div'} class="card ${['H', 'D'].includes(c.suit) ? 'red' : ''} ${c.rank === 0 ? 'joker' : ''} ${large ? 'large-card' : ''} ${selected.has(c.id) && interactive ? 'selected' : ''}" ${interactive ? `type="button" data-card="${esc(c.id)}" aria-pressed="${selected.has(c.id)}" aria-label="${label(c)}${c.rank === wildRank ? ', wild joker' : ''}"` : `aria-label="${label(c)}"`}><span class="card-corner">${ranks[c.rank] || c.rank}<small>${suits[c.suit]}</small></span><span class="card-suit" aria-hidden="true">${suits[c.suit]}</span><span class="card-corner bottom" aria-hidden="true">${ranks[c.rank] || c.rank}<small>${suits[c.suit]}</small></span>${c.rank === wildRank && c.rank > 0 ? '<span class="wild-badge">WILD</span>' : ''}</${interactive ? 'button' : 'div'}>`;
 
 function toast(text, error = false) {
   const el = document.querySelector('#toast'); el.textContent = text; el.className = `show ${error ? 'error' : ''}`;
@@ -114,7 +116,7 @@ function renderRoom() {
   const loose = state.hand.filter(c => !inGroups.has(c.id));
   const groupView = (ids, title, i) => `<div class="hand-group"><div class="group-heading"><span>${esc(title)}</span>${i !== undefined ? `<button class="ungroup" data-ungroup="${i}" aria-label="Ungroup ${esc(title)}">×</button>` : ''}</div><div class="cards">${ids.map(id => card(state.hand.find(c => c.id === id), true)).join('')}</div></div>`;
   app.innerHTML = `<div class="room-heading"><div><div class="eyebrow">YOUR PRIVATE CLUB <span class="connection" id="connection">● Connected</span></div><h1>The friends’ table<span class="round-badge">${state.round ? `Round ${state.round}` : 'Waiting room'}</span></h1></div><div class="button-row"><button class="button secondary small" data-action="invite">Invite friends <span>↗</span></button><button class="icon-button leave-button" data-action="leave" aria-label="Leave table" title="Leave table">⇥</button></div></div>
-  <nav class="board-toolbar" aria-label="Table tools"><button class="button secondary small" data-panel="chat">Chat</button><button class="button secondary small" data-panel="hand" ${!state.hand.length ? 'disabled' : ''}>View cards</button><button class="button secondary small" data-panel="standings">Standings</button><button class="button secondary small" data-panel="information">Table info</button><button class="button secondary small" data-panel="settings">Settings</button></nav>
+  <nav class="board-toolbar" aria-label="Table tools"><button class="button secondary small" data-action="tutorial">Learn rummy</button><button class="button secondary small" data-panel="chat">Chat</button><button class="button secondary small" data-panel="hand" ${!state.hand.length ? 'disabled' : ''}>View cards</button><button class="button secondary small" data-panel="standings">Standings</button><button class="button secondary small" data-panel="information">Table info</button><button class="button secondary small" data-panel="settings">Settings</button></nav>
   <div id="connection-banner" class="connection-banner" role="status" hidden></div><div id="command-status" class="sr-only" role="status"></div>
   <div class="game-layout"><section class="table-column"><div class="felt-table"><div class="felt-top"><span>13-CARD INDIAN RUMMY</span><span class="room-code">ROOM ${state.code} ${state.hasPassword ? '· LOCKED' : ''}</span></div><div class="seats">${state.players.filter(p => p.id !== state.me).map(p => `<div class="seat ${playing && state.turn === p.id ? 'active' : ''} ${p.dropped ? 'dropped' : ''}"><div class="avatar">${p.bot ? '✦' : esc(p.name.slice(0, 1).toUpperCase())}</div><strong>${esc(p.name)}</strong><span>${p.bot ? 'Practice bot' : p.id === state.host ? 'Table host' : 'Friend'}${p.dropped ? ' · Dropped' : playing ? ` · ${p.count} cards` : ''}</span>${playing && !p.dropped ? '<div class="mini-hand">▥ ▥ ▥ ▥ ▥</div>' : ''}${host && isLobby && p.bot ? `<button class="remove-bot" data-remove="${p.id}">Remove</button>` : ''}</div>`).join('')}${state.players.length < 6 && isLobby ? `<button class="seat empty-seat" data-action="invite"><span class="avatar">+</span><strong>A seat for a friend</strong><span>Share your invite link</span></button>` : ''}</div>
   ${state.status === 'lobby' ? `<div class="lobby-center"><span class="table-club">♣</span><h2>Great company.<br>One good game.</h2><p>${host ? 'Invite a friend or add a practice bot to get started.' : 'Make yourself comfortable. Your host will deal shortly.'}</p><div class="button-row">${host ? `<button class="button cream" data-action="start" ${state.players.length < 2 ? 'disabled' : ''}>Deal the first round <span>→</span></button><button class="button felt-outline" data-action="addBot" ${state.players.length >= 6 ? 'disabled' : ''}>+ Practice bot</button>` : '<span class="waiting-label">Waiting for the host to deal…</span>'}</div></div>` : `<div class="deck-area"><div class="pile"><span class="pile-label">CLOSED DECK</span><button class="card card-back" data-draw="stock" ${!myTurn || state.phase !== 'draw' ? 'disabled' : ''} aria-label="Draw from closed deck"><span>♣</span><small>M RUMMY</small></button><span class="pile-caption">${state.stockCount} cards</span></div><div class="pile"><span class="pile-label">OPEN DECK</span><button class="open-pile" data-draw="discard" ${!myTurn || state.phase !== 'draw' || !state.topDiscard || [0, state.wildRank].includes(state.topDiscard.rank) ? 'disabled' : ''} aria-label="Draw from open deck">${state.topDiscard ? card(state.topDiscard) : '<span class="empty-card">Empty</span>'}</button><span class="pile-caption">${state.topDiscard && [0, state.wildRank].includes(state.topDiscard.rank) ? 'Joker · cannot pick' : 'Take the top card'}</span></div><div class="wild-indicator"><span class="pile-label">WILD JOKER</span>${card(state.indicator)}<span class="pile-caption">All ${ranks[state.wildRank] || state.wildRank}s are wild</span></div></div>`}
@@ -130,6 +132,19 @@ function updateClock() {
   const el = document.querySelector('#turn-clock'); if (!el || !state) return;
   const seconds = remainingSeconds(state.deadline, clockOffset);
   el.textContent = `${seconds}s`; el.classList.toggle('urgent', seconds <= 15);
+}
+function showTutorial() {
+  tutorialIndex = 0; renderTutorial();
+  document.querySelector('#rules-dialog').close();
+  document.querySelector('#tutorial-dialog').showModal();
+}
+function renderTutorial() {
+  const step = tutorialSteps[tutorialIndex];
+  document.querySelector('#tutorial-title').textContent = step.title;
+  document.querySelector('#tutorial-progress').textContent = `Step ${tutorialIndex + 1} of ${tutorialSteps.length}`;
+  document.querySelector('#tutorial-content').innerHTML = `<p>${esc(step.text)}</p>${step.cards.length ? `<div class="tutorial-cards cards" aria-label="Example cards">${step.cards.map((c, i) => card({ ...c, id: `tutorial-${tutorialIndex}-${i}` }, false, false, null)).join('')}</div>` : ''}<p class="tutorial-note">${esc(step.note)}</p>`;
+  document.querySelector('#tutorial-back').disabled = tutorialIndex === 0;
+  document.querySelector('#tutorial-next').textContent = tutorialIndex === tutorialSteps.length - 1 ? 'Finish tutorial' : 'Next →';
 }
 function showGamePanel(panel) {
   if (!state) return;
@@ -258,6 +273,7 @@ app.addEventListener('click', async event => {
       document.querySelector('#invite-dialog').showModal(); break;
     }
     case 'rules': document.querySelector('#rules-dialog').showModal(); break;
+    case 'tutorial': showTutorial(); break;
     case 'sort': {
       const sorted = [...state.hand].sort((a, b) => ['S', 'H', 'C', 'D', 'J'].indexOf(a.suit) - ['S', 'H', 'C', 'D', 'J'].indexOf(b.suit) || a.rank - b.rank);
       groups = [{ ids: sorted.map(c => c.id), title: 'Sorted by suit' }]; selected.clear(); saveGroups(); renderRoom(); break;
@@ -342,6 +358,15 @@ app.addEventListener('submit', async event => {
   } catch (e) { toast(e.message, true); button.disabled = false; button.textContent = mode === 'create' ? 'Create your table ↗' : 'Take your seat ↗'; }
   finally { busy = false; }
 });
+document.querySelector('#tutorial-button').addEventListener('click', showTutorial);
+document.querySelector('#tutorial-back').addEventListener('click', () => { tutorialIndex = Math.max(0, tutorialIndex - 1); renderTutorial(); document.querySelector('#tutorial-title').focus(); });
+document.querySelector('#tutorial-next').addEventListener('click', () => {
+  if (tutorialIndex < tutorialSteps.length - 1) { tutorialIndex++; renderTutorial(); document.querySelector('#tutorial-title').focus(); }
+  else {
+    try { localStorage.setItem('mr-tutorial-complete', 'true'); } catch { /* Completion is optional. */ }
+    document.querySelector('#tutorial-dialog').close(); toast('Tutorial complete. You can revisit it from How to play.');
+  }
+});
 document.querySelector('#rules-button').addEventListener('click', () => document.querySelector('#rules-dialog').showModal());
 document.querySelector('#mobile-button').addEventListener('click', () => document.querySelector('#mobile-dialog').showModal());
 document.querySelector('#profile-button').addEventListener('click', () => { if (account) loadProfile(); else landing(); });
@@ -360,10 +385,19 @@ document.querySelector('#profile-dialog').addEventListener('click', async event 
   }
 });
 document.querySelectorAll('dialog').forEach(dialog => {
+  dialog.addEventListener('keydown', event => {
+    if (event.key !== 'Tab') return;
+    const controls = [...dialog.querySelectorAll('button, input, select, textarea, a[href], [tabindex="0"]')].filter(el => !el.disabled && el.getClientRects().length);
+    if (!controls.length) { event.preventDefault(); return; }
+    const first = controls[0], last = controls.at(-1);
+    if (event.shiftKey && (document.activeElement === first || !controls.includes(document.activeElement))) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && (document.activeElement === last || !controls.includes(document.activeElement))) { event.preventDefault(); first.focus(); }
+  });
   const title = dialog.querySelector('h2');
   if (title) { title.id ||= `${dialog.id}-title`; dialog.setAttribute('aria-labelledby', title.id); }
   let opener;
   dialog.addEventListener('close', () => {
+    if (document.querySelector('dialog[open]')) return;
     if (opener?.isConnected) opener.focus();
     else if (state) document.querySelector('[data-panel="' + (opener?.dataset.panel || 'hand') + '"]')?.focus();
   });
