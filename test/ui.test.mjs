@@ -406,3 +406,47 @@ test('full waiting table keeps long names contained across viewports', async t =
   await waitingScreenshot(page, 'waiting-full-mobile');
   assert.deepEqual(f.errors, []);
 });
+
+for (const [width, height] of [[390, 844], [768, 1024], [1024, 768], [1920, 1080]]) {
+  test(`source-styled active board fits six players at ${width}x${height}`, async t => {
+    const players = [waitingPlayer('me', 'Me', { count: 13, total: 20 }),
+      waitingPlayer('other', 'Friend', { count: 13, total: 40 }),
+      waitingPlayer('third', 'LongPlayerNameWithNoSpaces', { count: 13 }),
+      waitingPlayer('fourth', 'Away friend', { count: 13, presence: 'away' }),
+      waitingPlayer('fifth', 'Dropped friend', { count: 0, dropped: true, total: 20 }),
+      waitingPlayer('sixth', 'Practice bot', { count: 13, bot: true })];
+    const { page, room, errors } = await fixture(t, { width, height }, false, { players, turn: 'other' });
+    await page.locator('.gameplay-page img').evaluateAll(images => Promise.all(images.map(image => image.decode())));
+    assert.equal(await page.locator('.seats .seat').count(), 5);
+    assert.equal(await page.locator('.seat.active .seat-turn').innerText(), 'Playing now');
+    assert.match(await page.locator('[data-player-seat="other"] .seat-score').innerText(), /40 pts/);
+    assert.match(await page.locator('.self-score').innerText(), /20 total penalty pts/);
+    assert.equal(await page.locator('.hand-scroll [data-card]').count(), 13);
+    assert.equal(await page.locator('.seats [data-card]').count(), 0);
+    assert.equal(await page.locator('[data-draw="stock"]').isDisabled(), true);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    assert.equal(await page.locator('.seat, .hand-footer .button').evaluateAll(els => els.every(el => {
+      const b = el.getBoundingClientRect(); return b.left >= 0 && b.right <= innerWidth && b.width > 0 && b.height > 0;
+    })), true);
+    for (const action of ['discard', 'declare']) {
+      const box = await page.locator(`[data-action="${action}"] img`).boundingBox();
+      assert.equal(box.width, 18); assert.equal(box.height, 18);
+    }
+    assert.match(await page.locator('.felt-table').evaluate(el => getComputedStyle(el, '::before').backgroundImage), /waiting-table.png/);
+    if (process.env.UI_SCREENSHOT_DIR) {
+      await mkdir(process.env.UI_SCREENSHOT_DIR, { recursive: true });
+      await page.screenshot({ path: resolve(process.env.UI_SCREENSHOT_DIR, `gameplay-${width}.png`), fullPage: true });
+    }
+    room.turn = 'me'; room.version++;
+    await page.waitForFunction(() => !document.querySelector('[data-draw="stock"]').disabled);
+    assert.equal(await page.locator('.seat.active').count(), 0);
+    await page.locator('[data-draw="stock"]').click();
+    await page.locator('[data-card="drawn"]').waitFor();
+    await page.locator('[data-card="drawn"]').click();
+    assert.equal(await page.locator('[data-action="discard"]').isDisabled(), false);
+    await page.locator('[data-action="discard"]').click();
+    await page.waitForFunction(() => !!document.querySelector('[data-player-seat="other"].active'));
+    assert.equal(await page.locator('.hand-scroll [data-card]').count(), 13);
+    assert.deepEqual(errors, []);
+  });
+}
