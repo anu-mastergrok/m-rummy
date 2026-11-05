@@ -21,7 +21,7 @@ test('HTTP multiplayer, isolation, CSRF, competing moves, reconnect, and durable
     processPHP = spawn(process.env.PHP_BIN || 'php', ['-S', `127.0.0.1:${port}`, '-t', 'public', 'public/router.php'], { cwd: resolve('.'), env: { ...process.env, RUMMY_DEV: '1', RUMMY_TEST_DATA_DIR: data }, stdio: ['ignore', 'ignore', 'pipe'] });
     processPHP.stderr.on('data', chunk => { stderr += chunk; });
     for (let i = 0; i < 80; i++) {
-      try { const response = await fetch(base); if (response.ok) return; } catch { /* Startup only. */ }
+      try { const response = await fetch(base); await response.text(); if (response.ok) return; } catch { /* Startup only. */ }
       await delay(50);
     }
     throw new Error(`PHP failed to start: ${stderr}`);
@@ -32,6 +32,9 @@ test('HTTP multiplayer, isolation, CSRF, competing moves, reconnect, and durable
   for (const file of ['app.js', 'board-state.js', 'tutorial.js']) {
     const module = await fetch(`${base}/${file}`); assert.equal(module.status, 200, `${file} must be served by the PHP router`);
     assert.match(module.headers.get('content-type'), /javascript/);
+    // Drain and verify full source; leaving a large response unread can pause
+    // Node's fetch parser while the PHP development server closes the socket.
+    assert.equal(await module.text(), await readFile(`public/${file}`, 'utf8'));
   }
   async function user() {
     const response = await fetch(`${base}/api/session`); const cookie = response.headers.get('set-cookie').split(';')[0];
