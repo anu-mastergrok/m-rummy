@@ -49,3 +49,12 @@ implements the brief's supported interactions using existing components.
 Each milestone is committed and pushed to feat/m-rummy-game-board-figma.
 Reference-size visual acceptance and unsupported engine features remain explicitly
 pending; this branch must not be described as a pixel-perfect Figma implementation.
+
+### Milestone 2 validation
+
+Added round-scoped local grouping with malformed/duplicate/stale card filtering,
+server-offset deadline helpers, persistent reconnect/resync status, immediate
+pending guards, and no automatic replay after an uncertain request. Returning
+from background or a network change requires a fresh snapshot before commands.
+Node syntax and three focused presentation tests pass. PHP is not installed in
+the editing environment; the repository workflow supplies PHP for full regression.

@@ -1,8 +1,12 @@
+import { remainingSeconds, reconcileGroups, tableStandings } from './board-state.js';
 const app = document.querySelector('#app');
 const suits = { S: '♠', H: '♥', D: '♦', C: '♣', J: '✦' };
 const ranks = { 0: 'JK', 1: 'A', 11: 'J', 12: 'Q', 13: 'K' };
 let session, state, busy = false, polling = false, failures = 0, mode = 'create', groups = [], selected = new Set(), chatDraft = '', clockOffset = 0;
 let lastCode = '', confirmAction;
+let connection = 'connected';
+const groupKey = room => `mr-groups-${room.code}-${room.round}`;
+const commandSelector = '[data-draw], [data-remove], [data-action="start"], [data-action="addBot"], [data-action="drop"], [data-action="discard"], [data-action="declare"], [data-action="arrange"], [data-action="leave"], #chat-form button';
 let authMode = 'register', account = null, profileOffset = 0, authBusy = false;
 const number = value => Number(value || 0).toLocaleString('en-IN');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -27,24 +31,20 @@ async function request(path, data) {
   }
   return result;
 }
-function saveGroups() { try { sessionStorage.setItem(`mr-groups-${state.code}`, JSON.stringify(groups)); } catch { /* Private browsing may disable storage. */ } }
+function saveGroups() { try { sessionStorage.setItem(groupKey(state), JSON.stringify(groups)); } catch { /* Private browsing may disable storage. */ } }
 function accept(next) {
   if (state && next.code === state.code && next.version < state.version) return;
   const changed = !state || next.version !== state.version || next.code !== state.code;
-  if (next.code !== lastCode) {
-    try { groups = JSON.parse(sessionStorage.getItem(`mr-groups-${next.code}`) || '[]'); } catch { groups = []; }
-    lastCode = next.code;
+  if (!state || next.code !== state.code || next.round !== state.round) {
+    try { groups = JSON.parse(sessionStorage.getItem(groupKey(next)) || '[]'); } catch { groups = []; }
+    selected.clear(); lastCode = next.code;
   }
-  if (state && next.round !== state.round) { groups = []; selected.clear(); }
   state = next; clockOffset = next.serverTime - Date.now();
   setAccount(next.account || null);
   selected = new Set([...selected].filter(id => next.hand.some(c => c.id === id)));
-  groups = groups.map(g => {
-    const ids = g.ids.filter(id => next.hand.some(c => c.id === id));
-    return { ...g, ids, title: ids.length === g.ids.length ? g.title : 'Group' };
-  }).filter(g => g.ids.length);
+  groups = reconcileGroups(groups, next.hand);
   if (changed) renderRoom();
-  updateClock();
+  updateClock(); syncControls();
 }
 function landing() {
   state = null; selected.clear(); groups = [];
@@ -105,6 +105,7 @@ function renderRoom() {
   const loose = state.hand.filter(c => !inGroups.has(c.id));
   const groupView = (ids, title, i) => `<div class="hand-group"><div class="group-heading"><span>${esc(title)}</span>${i !== undefined ? `<button class="ungroup" data-ungroup="${i}" aria-label="Ungroup ${esc(title)}">×</button>` : ''}</div><div class="cards">${ids.map(id => card(state.hand.find(c => c.id === id), true)).join('')}</div></div>`;
   app.innerHTML = `<div class="room-heading"><div><div class="eyebrow">YOUR PRIVATE CLUB <span class="connection" id="connection">● Connected</span></div><h1>The friends’ table<span class="round-badge">${state.round ? `Round ${state.round}` : 'Waiting room'}</span></h1></div><div class="button-row"><button class="button secondary small" data-action="invite">Invite friends <span>↗</span></button><button class="icon-button leave-button" data-action="leave" aria-label="Leave table" title="Leave table">⇥</button></div></div>
+  <div id="connection-banner" class="connection-banner" role="status" hidden></div><div id="command-status" class="sr-only" role="status"></div>
   <div class="game-layout"><section class="table-column"><div class="felt-table"><div class="felt-top"><span>13-CARD INDIAN RUMMY</span><span class="room-code">ROOM ${state.code} ${state.hasPassword ? '· LOCKED' : ''}</span></div><div class="seats">${state.players.filter(p => p.id !== state.me).map(p => `<div class="seat ${playing && state.turn === p.id ? 'active' : ''} ${p.dropped ? 'dropped' : ''}"><div class="avatar">${p.bot ? '✦' : esc(p.name.slice(0, 1).toUpperCase())}</div><strong>${esc(p.name)}</strong><span>${p.bot ? 'Practice bot' : p.id === state.host ? 'Table host' : 'Friend'}${p.dropped ? ' · Dropped' : playing ? ` · ${p.count} cards` : ''}</span>${playing && !p.dropped ? '<div class="mini-hand">▥ ▥ ▥ ▥ ▥</div>' : ''}${host && isLobby && p.bot ? `<button class="remove-bot" data-remove="${p.id}">Remove</button>` : ''}</div>`).join('')}${state.players.length < 6 && isLobby ? `<button class="seat empty-seat" data-action="invite"><span class="avatar">+</span><strong>A seat for a friend</strong><span>Share your invite link</span></button>` : ''}</div>
   ${state.status === 'lobby' ? `<div class="lobby-center"><span class="table-club">♣</span><h2>Great company.<br>One good game.</h2><p>${host ? 'Invite a friend or add a practice bot to get started.' : 'Make yourself comfortable. Your host will deal shortly.'}</p><div class="button-row">${host ? `<button class="button cream" data-action="start" ${state.players.length < 2 ? 'disabled' : ''}>Deal the first round <span>→</span></button><button class="button felt-outline" data-action="addBot" ${state.players.length >= 6 ? 'disabled' : ''}>+ Practice bot</button>` : '<span class="waiting-label">Waiting for the host to deal…</span>'}</div></div>` : `<div class="deck-area"><div class="pile"><span class="pile-label">CLOSED DECK</span><button class="card card-back" data-draw="stock" ${!myTurn || state.phase !== 'draw' ? 'disabled' : ''} aria-label="Draw from closed deck"><span>♣</span><small>M RUMMY</small></button><span class="pile-caption">${state.stockCount} cards</span></div><div class="pile"><span class="pile-label">OPEN DECK</span><button class="open-pile" data-draw="discard" ${!myTurn || state.phase !== 'draw' || !state.topDiscard || [0, state.wildRank].includes(state.topDiscard.rank) ? 'disabled' : ''} aria-label="Draw from open deck">${state.topDiscard ? card(state.topDiscard) : '<span class="empty-card">Empty</span>'}</button><span class="pile-caption">${state.topDiscard && [0, state.wildRank].includes(state.topDiscard.rank) ? 'Joker · cannot pick' : 'Take the top card'}</span></div><div class="wild-indicator"><span class="pile-label">WILD JOKER</span>${card(state.indicator)}<span class="pile-caption">All ${ranks[state.wildRank] || state.wildRank}s are wild</span></div></div>`}
   <div class="table-status"><span class="status-dot"></span><span>${esc(turnText())}</span>${playing ? '<span id="turn-clock" class="turn-clock"></span>' : ''}</div></div>
@@ -113,16 +114,42 @@ function renderRoom() {
   <aside class="sidebar"><section class="side-card"><div class="side-heading"><h2>Table talk</h2><span>${state.players.length}/6 seated</span></div><div class="messages" id="messages">${state.messages.length ? state.messages.map(m => `<div class="message"><span>${esc(m.name)} <time>${new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></span><p>${esc(m.text)}</p></div>`).join('') : '<div class="empty-chat"><span>“</span><p>The best part of cards?<br>The conversation.</p><small>Say hello to your table.</small></div>'}</div><form class="chat-form" id="chat-form"><label class="sr-only" for="chat-input">Message your table</label><input id="chat-input" maxlength="240" placeholder="Say something…" required autocomplete="off" value="${esc(chatDraft)}"><button type="submit" aria-label="Send message">↑</button></form></section><section class="side-card activity"><div class="side-heading"><h2>At the table</h2><span class="live-dot">LIVE</span></div><div>${state.activity.slice(0, 7).map(a => `<p><span></span>${esc(a.text)}</p>`).join('')}</div></section><section class="table-tip"><span>✧ THE WINNING HAND</span><p>Two sequences.<br>One of them pure.<br><em>The rest is up to you.</em></p><button class="text-button" data-action="rules">A quick rules refresher ↗</button></section>${state.history.length > 1 ? `<details class="side-card history"><summary>Previous rounds</summary>${state.history.slice(1).map(h => `<p>Round ${h.round} <strong>${esc(h.winner)}</strong></p>`).join('')}</details>` : ''}</aside></div>`;
   const messageBox = document.querySelector('#messages'); if (messageBox) messageBox.scrollTop = messageBox.scrollHeight;
   if (focus === 'chat-input') { const input = document.querySelector('#chat-input'); input.focus(); input.setSelectionRange(selectionStart, selectionStart); }
-  updateClock();
+  updateClock(); syncControls(true);
 }
 function updateClock() {
   const el = document.querySelector('#turn-clock'); if (!el || !state) return;
-  const seconds = Math.max(0, Math.ceil((state.deadline - Date.now() - clockOffset) / 1000));
+  const seconds = remainingSeconds(state.deadline, clockOffset);
   el.textContent = `${seconds}s`; el.classList.toggle('urgent', seconds <= 15);
 }
+function syncControls(fresh = false) {
+  if (!state) return;
+  const blocked = busy || connection !== 'connected';
+  app.querySelectorAll(commandSelector).forEach(button => {
+    if (fresh || !button.dataset.legal) button.dataset.legal = button.disabled ? 'no' : 'yes';
+    button.disabled = blocked || button.dataset.legal === 'no';
+  });
+  app.querySelectorAll('[data-card], [data-ungroup], [data-action="sort"], [data-action="group"]').forEach(button => {
+    if (fresh || !button.dataset.legal) button.dataset.legal = button.disabled ? 'no' : 'yes';
+    button.disabled = busy || button.dataset.legal === 'no';
+  });
+  app.setAttribute('aria-busy', String(busy));
+  const indicator = document.querySelector('#connection');
+  if (indicator) {
+    indicator.textContent = connection === 'connected' ? '● Connected' : connection === 'syncing' ? '● Syncing' : '● Reconnecting';
+    indicator.classList.toggle('offline', connection !== 'connected');
+  }
+  const banner = document.querySelector('#connection-banner');
+  if (banner) {
+    banner.hidden = connection === 'connected';
+    banner.textContent = connection === 'syncing' ? 'Refreshing your hand and turn from the server…' : 'Connection interrupted. Reconnecting automatically. Game actions resume after your table is refreshed.';
+  }
+  const status = document.querySelector('#command-status');
+  if (status) status.textContent = busy ? 'Sending your action…' : '';
+}
+function setConnection(next) { connection = next; syncControls(); }
 async function action(actionName, extra = {}) {
-  if (busy || !state) return;
-  busy = true; app.setAttribute('aria-busy', 'true');
+  if (busy || !state || connection !== 'connected') return false;
+  busy = true; syncControls();
   try {
     const result = await request('/api/action', { code: state.code, version: state.version, action: actionName, ...extra });
     if (actionName === 'arrange') {
@@ -137,20 +164,23 @@ async function action(actionName, extra = {}) {
     } else if (result.left) { history.replaceState({}, '', '/'); landing(); }
     else { if (['discard', 'declare'].includes(actionName)) selected.clear(); accept(result); saveGroups(); }
     return true;
-  } catch (e) { toast(e.message, true); return false; }
-  finally { busy = false; app.removeAttribute('aria-busy'); }
+  } catch (e) {
+    if (!e.status || e.status >= 500) setConnection('reconnecting');
+    toast(e.message, true); return false;
+  }
+  finally { busy = false; syncControls(); }
 }
 async function poll() {
   if (!state || polling || busy) return;
   polling = true;
+  if (connection !== 'connected') setConnection('syncing');
   try {
     const result = await request(`/api/room?code=${state.code}`);
     if (result.code !== state?.code) return;
-    failures = 0; accept(result);
-    const indicator = document.querySelector('#connection'); if (indicator) { indicator.textContent = '● Connected'; indicator.classList.remove('offline'); }
+    failures = 0; accept(result); setConnection('connected');
   } catch (e) {
     if (++failures === 2) toast('Connection interrupted. Reconnecting automatically…', true);
-    const indicator = document.querySelector('#connection'); if (indicator) { indicator.textContent = '● Reconnecting'; indicator.classList.add('offline'); }
+    setConnection('reconnecting');
     if (e.status === 404) { history.replaceState({}, '', '/'); landing(); toast(e.message, true); }
   } finally { polling = false; }
 }
@@ -224,7 +254,7 @@ app.addEventListener('submit', async event => {
   const data = Object.fromEntries(new FormData(event.target));
   try {
     const result = await request(mode === 'create' ? '/api/create' : '/api/join', data);
-    localStorage.setItem('mr-name', data.name); history.replaceState({}, '', `/?room=${result.code}`); accept(result);
+    localStorage.setItem('mr-name', data.name); history.replaceState({}, '', `/?room=${result.code}`); accept(result); setConnection('connected');
   } catch (e) { toast(e.message, true); button.disabled = false; button.textContent = mode === 'create' ? 'Create your table ↗' : 'Take your seat ↗'; }
   finally { busy = false; }
 });
@@ -258,10 +288,13 @@ async function boot() {
     setAccount(session.account || null);
     if (session.room) { const room = await request(`/api/room?code=${session.room}`); history.replaceState({}, '', `/?room=${room.code}`); accept(room); }
     else landing();
+    setConnection('connected');
   } catch (e) { app.innerHTML = '<div class="boot-error"><h1>The table is taking a moment.</h1><p>Check your connection and reload to try again.</p><button class="button primary" id="retry">Try again</button></div>'; document.querySelector('#retry').onclick = boot; toast(e.message, true); }
 }
 setInterval(poll, 1200); setInterval(updateClock, 500);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && state) { setConnection('syncing'); poll(); } });
+window.addEventListener('offline', () => setConnection('reconnecting'));
+window.addEventListener('online', () => { if (state) { setConnection('syncing'); poll(); } });
 boot();
 if ('serviceWorker' in navigator && window.isSecureContext) {
   navigator.serviceWorker.register('/sw.js').catch(() => { /* Live browser play remains available without installation support. */ });
