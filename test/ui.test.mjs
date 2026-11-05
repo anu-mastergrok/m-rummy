@@ -246,3 +246,57 @@ test('an older in-flight aggregate poll cannot roll back turn indicators after a
   assert.match(await page.locator(`[data-table-clock="${room.code}"]`).innerText(), /^Playing/);
   assert.deepEqual(f.errors, []);
 });
+
+test('presence-only snapshots update seat badges without replacing cards or chat input', async t => {
+  const { page, room, requests, errors } = await fixture(t);
+  await page.locator('[data-card="card-4"]').click();
+  await page.locator('#chat-input').fill('Draft remains'); await page.locator('#chat-input').focus();
+  await page.evaluate(() => { window.cardBeforePresence = document.querySelector('[data-card="card-4"]'); window.chatBeforePresence = document.querySelector('#chat-input'); });
+  const version = room.version, deadline = room.deadline;
+  room.players[0].presence = 'online'; room.players[1].presence = 'away';
+  await page.locator('[data-presence-player="other"][data-presence="away"]').waitFor();
+  assert.equal(await page.locator('[data-presence-player="other"]').innerText(), 'Away');
+  assert.equal(await page.evaluate(() => window.cardBeforePresence === document.querySelector('[data-card="card-4"]') && window.chatBeforePresence === document.querySelector('#chat-input')), true);
+  assert.equal(await page.locator('[data-card="card-4"]').getAttribute('aria-pressed'), 'true');
+  assert.equal(await page.locator('#chat-input').inputValue(), 'Draft remains');
+  assert.equal(await page.locator('#chat-input').evaluate(e => e === document.activeElement), true);
+  room.players[1].presence = 'offline';
+  await page.locator('[data-presence-player="other"][data-presence="offline"]').waitFor();
+  room.players[1].presence = 'online';
+  await page.locator('[data-presence-player="other"][data-presence="online"]').waitFor();
+  assert.equal(room.version, version); assert.equal(room.deadline, deadline); assert.equal(requests.length, 0); assert.deepEqual(errors, []);
+});
+
+test('each page sends visibility and ordered heartbeats, with a fresh client after reload', async t => {
+  const { page, errors } = await fixture(t);
+  const visibleRequest = page.waitForRequest(r => r.url().includes('/api/tables') && new URL(r.url()).searchParams.get('visible') === '1');
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  const first = new URL((await visibleRequest).url());
+  assert.match(first.searchParams.get('client'), /^[a-f0-9]{32}$/);
+  await page.waitForFunction(() => document.querySelector('#connection-banner').hidden);
+  const hiddenRequest = page.waitForRequest(r => r.url().includes('/api/tables') && new URL(r.url()).searchParams.get('visible') === '0');
+  await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); });
+  const hidden = new URL((await hiddenRequest).url());
+  assert.equal(hidden.searchParams.get('client'), first.searchParams.get('client'));
+  assert.ok(Number(hidden.searchParams.get('sequence')) > Number(first.searchParams.get('sequence')));
+  const foregroundRequest = page.waitForRequest(r => r.url().includes('/api/tables') && new URL(r.url()).searchParams.get('visible') === '1');
+  await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); document.dispatchEvent(new Event('visibilitychange')); });
+  const foreground = new URL((await foregroundRequest).url());
+  assert.ok(Number(foreground.searchParams.get('sequence')) > Number(hidden.searchParams.get('sequence')));
+  // The outgoing document can send a final hidden heartbeat during navigation.
+  const reloadRequest = page.waitForRequest(r => r.url().includes('/api/tables') && new URL(r.url()).searchParams.get('client') !== first.searchParams.get('client'));
+  await page.reload(); const reloaded = new URL((await reloadRequest).url());
+  assert.notEqual(reloaded.searchParams.get('client'), first.searchParams.get('client')); assert.deepEqual(errors, []);
+});
+
+test('local network loss marks self reconnecting and treats remote presence as unknown until resync', async t => {
+  const f = await fixture(t); const { page, room } = f;
+  room.players.forEach(p => { p.presence = 'online'; });
+  await page.locator('[data-presence-player="other"][data-presence="online"]').waitFor();
+  f.setOffline(true); await page.evaluate(() => window.dispatchEvent(new Event('offline')));
+  assert.equal(await page.locator('[data-presence-player="me"]').innerText(), 'Reconnecting');
+  assert.equal(await page.locator('[data-presence-player="other"]').innerText(), 'Status unknown');
+  f.setOffline(false); await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await page.locator('[data-presence-player="other"][data-presence="online"]').waitFor();
+  assert.equal(await page.locator('[data-presence-player="me"]').innerText(), 'Connected'); assert.deepEqual(f.errors, []);
+});

@@ -135,3 +135,15 @@ Timers continue on every table while you use another. Refreshing restores your
 selected table when the membership is still valid. An expired/left table opens a
 picker for your remaining tables. See [docs/MULTIPLE_TABLES.md](docs/MULTIPLE_TABLES.md)
 for API and validation details.
+
+
+## Player connection status
+
+Human seats and your hand show **Connected**, **Away**, **Not responding**, or
+**Status unknown**. These are activity hints: a backgrounded browser or a stalled
+connection can change the badge, and turn timers keep running. Activity is combined
+across your tabs/devices and joined tables. A hidden tab cannot mark another active
+device away. Bots have a separate **Practice bot** label. Your own disconnected view
+shows **Reconnecting**, with other players' status unknown until the next resync.
+Presence updates preserve hands, selections and game versions. Older clients remain
+compatible. See [docs/PLAYER_PRESENCE.md](docs/PLAYER_PRESENCE.md) for details.

@@ -8,7 +8,7 @@ function fixture(bool $existing = true, ?string $baseDirectory = null): array {
     $base = ($baseDirectory ?? sys_get_temp_dir()) . '/mr-deploy-' . bin2hex(random_bytes(6)); $fixtures[] = $base;
     $root = $base . '/site'; $sha = str_repeat('a', 40); $stage = $root . '/.rummy-staging/' . $sha;
     mkdir($root . '/public_html', 0755, true); mkdir($stage, 0700, true);
-    $files = ['public/index.html', 'public/api.php', 'public/.htaccess', 'public/app.js', 'server/bootstrap.php', 'server/accounts.php', 'server/game.php', 'server/rules.php'];
+    $files = ['public/index.html', 'public/api.php', 'public/.htaccess', 'public/app.js', 'public/board-state.js', 'public/tutorial.js', 'server/bootstrap.php', 'server/accounts.php', 'server/presence.php', 'server/game.php', 'server/rules.php'];
     $manifest = ['version' => 1, 'commit' => $sha, 'files' => []];
     foreach ($files as $file) {
         if (!is_dir(dirname($stage . '/' . $file))) mkdir(dirname($stage . '/' . $file), 0755, true);
@@ -50,6 +50,16 @@ test('SSH release updates code and preserves exact player state and private conf
     same(file_get_contents($backups[0] . '/config.php'), $config); same(file_get_contents($backups[0] . '/state.json'), $state);
     same(fileperms($backups[0] . '/state.json') & 0777, 0600);
     run_install($f); same(file_get_contents($root . '/data/state.json'), $state); same(file_get_contents($root . '/server/config.php'), $config);
+});
+test('Missing required presence or browser modules are refused before replacing any code', function() {
+    foreach (['server/presence.php', 'public/board-state.js', 'public/tutorial.js'] as $required) {
+        $f = fixture(); $old = file_get_contents($f[0] . '/server/bootstrap.php');
+        $manifest = json_decode(file_get_contents($f[1] . '/manifest.json'), true);
+        unset($manifest['files'][$required]); file_put_contents($f[1] . '/manifest.json', json_encode($manifest));
+        rejects(fn() => run_install($f), 'missing required');
+        same(file_get_contents($f[0] . '/server/bootstrap.php'), $old);
+        check(!file_exists($f[0] . '/.m-rummy-deploy.json'));
+    }
 });
 test('First deployment initializes HTTPS configuration outside public_html', function() {
     $f = fixture(false); run_install($f); $config = require $f[0] . '/server/config.php';

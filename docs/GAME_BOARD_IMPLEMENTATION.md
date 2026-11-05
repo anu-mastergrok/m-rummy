@@ -1,6 +1,7 @@
 # Game board implementation tracking
 
 Follow-up: multi-table support is implemented in [MULTIPLE_TABLES.md](MULTIPLE_TABLES.md).
+Follow-up: advisory player presence is implemented in [PLAYER_PRESENCE.md](PLAYER_PRESENCE.md).
 The audit and verified-delivery sections below describe the original milestone
 and its engine constraints at that point in time.
 
