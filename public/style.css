@@ -25,3 +25,10 @@ button,a,summary{touch-action:manipulation}input{scroll-margin-top:24px}.footer-
 /* Advisory presence is text-labelled and separate from turn/drop styling. */
 .player-presence{display:inline-flex;align-items:center;gap:4px;font-size:10px;line-height:1.4;border:1px solid currentColor;border-radius:12px;padding:2px 6px;margin-top:5px;color:var(--muted)}.player-presence::before{content:'';display:inline-block;flex:0 0 5px;width:5px;height:5px;border-radius:50%;background:currentColor}.player-presence[data-presence=online]{color:#326044}.player-presence[data-presence=away]{color:#7e581b}.player-presence[data-presence=offline],.player-presence[data-presence=reconnecting]{color:#874631}.seat>span.player-presence{font-size:10px;max-width:100%;color:#d7dfce}.seat .player-presence[data-presence=online]{color:#dcecc9}.seat .player-presence[data-presence=away]{color:#ffe6ad}.seat .player-presence[data-presence=offline]{color:#f1c9b9}
 @media(max-width:600px){.seat>span.player-presence{font-size:9px;line-height:1.35;padding:2px 4px;white-space:normal}.hand-header .player-presence{font-size:10px}}
+
+/* Figma 11:74043: the square artwork includes its own transparent margins. */
+.is-booting{background:#17162e}
+.is-booting>.site-header,.is-booting>.site-footer{display:none}
+.splash-screen{min-height:100vh;min-height:100svh;position:relative;display:grid;place-items:center;background:#17162e;overflow:hidden}
+.splash-art{display:block;width:min(640px,59.2593svh,100vw);height:auto;aspect-ratio:1;object-fit:cover;transform:rotate(90deg);pointer-events:none}
+.visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}

@@ -551,12 +551,17 @@ document.querySelector('#copy-invite').addEventListener('click', async () => {
   catch { input.focus(); input.select(); toast('Select and copy this link to share it.'); }
 });
 async function boot() {
+  app.setAttribute('aria-busy', 'true');
   try {
     session = await request('/api/session');
     setAccount(session.account || null);
     await restoreTables();
     setConnection('connected');
   } catch (e) { app.innerHTML = '<div class="boot-error"><h1>The table is taking a moment.</h1><p>Check your connection and reload to try again.</p><button class="button primary" id="retry">Try again</button></div>'; document.querySelector('#retry').onclick = boot; toast(e.message, true); }
+  finally {
+    document.body.classList.remove('is-booting');
+    app.removeAttribute('aria-busy');
+  }
 }
 setInterval(poll, 1200); setInterval(updateClock, 500);
 document.addEventListener('visibilitychange', () => {
