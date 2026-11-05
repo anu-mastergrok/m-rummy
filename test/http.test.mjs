@@ -125,6 +125,18 @@ test('HTTP multiplayer, isolation, CSRF, competing moves, reconnect, and durable
   const retained = (await request(c, 'profile')).body;
   assert.equal(retained.points, 10100); assert.equal(retained.historyTotal, 2); assert.equal(retained.wins, 1);
   const rematch = await request(a, 'action', { code, action: 'start', version: finished.body.version }); assert.equal(rematch.body.round, 2); assert.equal(rematch.body.hand.length, 13);
+  // Multiple memberships survive a process restart; another account cannot list them.
+  const second = await request(a, 'create', {}), third = await request(a, 'create', {});
+  assert.equal(second.status, 200); assert.equal(third.status, 200);
+  assert.equal((await request(a, 'create', {})).status, 400);
+  const multi = (await request(a, `tables?code=${second.body.code}`)).body;
+  assert.equal(multi.tables.length, 3); assert.equal(multi.active.code, second.body.code);
+  assert.ok(multi.tables.every(t => !('hand' in t) && !('messages' in t)));
+  assert.equal((await request(b, `tables?code=${second.body.code}`)).body.active, null);
+  await stop(); await start();
+  assert.deepEqual((await request(a, 'session')).body.rooms, [code, second.body.code, third.body.code]);
+  assert.equal((await request(a, `tables?code=${code}`)).body.active.hand.length, 13);
+
 });
 
 test('Existing guest deployment upgrades with a private backup and can save its seat as an account', async t => {

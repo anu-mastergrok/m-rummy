@@ -10,6 +10,7 @@ A private, play-for-fun 13-card Indian rummy app for friends and family. Built f
 - Create an invite-only table with a random 12-character code and optional password.
 - Play with 2–6 people; add practice bots to empty seats between rounds.
 - Share a room link, chat at the table, and return to your seat after refreshing.
+- Join up to three independent tables; switch without losing groups, selections or chat drafts. Inactive table timers keep running.
 - Draw, select cards, sort, manually group, auto-group, discard, drop, and declare.
 - Play timed turns with server-side validation and automatic missed-turn handling.
 - See round scores, cumulative penalty points, winning groups, and previous rounds.
@@ -65,7 +66,7 @@ Upload **only public/** into the site's public document root. Keep **server/** a
 
 ## How the multiplayer server works
 
-The browser asks the PHP API for state every 1.2 seconds while the table is open. Every move is validated on the server. A player receives their own cards and public table details; opponents' hands and the closed deck order are not sent during a round. All hands become public in the finished round result.
+The browser asks the PHP API for its joined tables every 1.2 seconds while tables are open. One request advances all joined-table deadlines and returns summaries plus the selected table’s private snapshot. Every move is validated on the server. A player receives their own cards and public table details; opponents' hands and the closed deck order are not sent during a round. All hands become public in the finished round result.
 
 State is saved as JSON outside the web root. An exclusive `flock` on a separate lock file serializes each request, and a temporary-file rename saves state atomically. Version checks reject competing/stale moves. Sessions, passwords (hashed), rooms, and scores survive PHP worker restarts. This architecture targets one small friends-and-family server, **not a large public gaming platform** or multiple replicas on shared network storage.
 
@@ -121,3 +122,16 @@ tracked in [docs/GAME_BOARD_IMPLEMENTATION.md](docs/GAME_BOARD_IMPLEMENTATION.md
 Optional browser regression checks use `npm install --no-save --package-lock=false
 playwright@1.56.1`, `npx playwright install chromium`, then `npm run test:ui`.
 Runtime hosting still requires only PHP and the static public files.
+
+
+## Playing at multiple tables
+
+Use **+ Add table** to create another private table or join an invite. Each player
+can occupy up to three tables, including waiting and finished tables. Leave an
+idle table to free a slot. Switching retrieves the latest server snapshot and
+keeps card groups, selections and unsent chat drafts separate. The table rail
+shows when it is your turn at an inactive table; it never switches automatically.
+Timers continue on every table while you use another. Refreshing restores your
+selected table when the membership is still valid. An expired/left table opens a
+picker for your remaining tables. See [docs/MULTIPLE_TABLES.md](docs/MULTIPLE_TABLES.md)
+for API and validation details.

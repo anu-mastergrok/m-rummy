@@ -19,7 +19,7 @@ async function fixture(t, viewport = { width: 1920, height: 1080 }, multi = fals
   const rooms = new Map([[room.code, room]]);
   if (multi) rooms.set('BBBBBB123456', { ...structuredClone(room), code: 'BBBBBB123456', deadline: Date.now() + 45000, hand: hand.map(c => ({ ...c, suit: 'S' })), messages: [] });
   const requests = [];
-  let offline = false, hold = false, held;
+  let offline = false, hold = false, held, holdPoll = false, pollStarted, releasePoll;
   await page.route('http://rummy.test/**', async route => {
     const path = new URL(route.request().url()).pathname;
     if (path.startsWith('/api/')) {
@@ -28,7 +28,9 @@ async function fixture(t, viewport = { width: 1920, height: 1080 }, multi = fals
       if (path === '/api/tables') {
         const active = rooms.get(new URL(route.request().url()).searchParams.get('code'));
         const tables = [...rooms.values()].map(r => ({ code: r.code, version: r.version, round: r.round, status: r.status, phase: r.phase, deadline: r.deadline, yourTurn: r.turn === r.me, dropped: false, playerCount: r.players.length }));
-        return route.fulfill({ json: { tables, active: active ? { ...active, serverTime: Date.now() } : null, tableLimit: 3, serverTime: Date.now() } });
+        const payload = structuredClone({ tables, active: active ? { ...active, serverTime: Date.now() } : null, tableLimit: 3, serverTime: Date.now() });
+        if (holdPoll) { holdPoll = false; pollStarted?.(); await new Promise(r => { releasePoll = r; }); }
+        return route.fulfill({ json: payload });
       }
       if (path === '/api/create' || path === '/api/join') {
         const input = route.request().postDataJSON();
@@ -45,6 +47,7 @@ async function fixture(t, viewport = { width: 1920, height: 1080 }, multi = fals
         if (input.action === 'leave') { rooms.delete(input.code); return route.fulfill({ json: { left: true } }); }
         if (input.action === 'declare') return route.fulfill({ status: 400, json: { error: 'Your hand needs a pure sequence.' } });
         if (input.action === 'draw') { target.phase = 'discard'; target.hand = [...target.hand, { id: 'drawn', rank: 2, suit: 'S' }]; }
+        if (input.action === 'discard') { target.hand = target.hand.filter(c => c.id !== input.cardId); target.turn = 'other'; target.phase = 'draw'; target.deadline = Date.now() + 60000; }
         if (input.action === 'chat') target.messages.push({ id: `m${requests.length}`, name: 'Me', text: input.text, time: Date.now() });
         target.version++;
         return route.fulfill({ json: { ...target, serverTime: Date.now() } });
@@ -59,7 +62,7 @@ async function fixture(t, viewport = { width: 1920, height: 1080 }, multi = fals
   });
   await page.goto('http://rummy.test/');
   await page.getByRole('button', { name: 'View cards', exact: true }).waitFor();
-  return { page, room, rooms, requests, errors, setOffline: value => { offline = value; }, hold: () => { hold = true; }, release: () => { hold = false; held?.(); } };
+  return { page, room, rooms, requests, errors, holdNextPoll: () => { holdPoll = true; return new Promise(r => { pollStarted = r; }); }, releasePoll: () => releasePoll?.(), setOffline: value => { offline = value; }, hold: () => { hold = true; }, release: () => { hold = false; held?.(); } };
 }
 const open = (page, name) => page.getByRole('button', { name, exact: true }).click();
 const close = page => page.getByRole('button', { name: 'Close table panel' }).click();
@@ -229,4 +232,17 @@ test('expiration removes selected table without silently switching or replaying 
   assert.equal(await page.locator('.hand-scroll [data-card]').count(), 0);
   await page.locator('[data-switch-table="BBBBBB123456"]').click(); await page.waitForURL('**/?room=BBBBBB123456');
   assert.equal(requests.length, 0); assert.deepEqual(errors, []);
+});
+
+test('an older in-flight aggregate poll cannot roll back turn indicators after a command', async t => {
+  const f = await fixture(t, undefined, true); const { page, room } = f;
+  await page.locator('[data-draw="stock"]').click(); await page.locator('[data-card="drawn"]').waitFor();
+  await f.holdNextPoll();
+  await page.locator('[data-card="drawn"]').click(); await page.locator('[data-action="discard"]').click();
+  await page.waitForFunction(code => document.querySelector(`[data-table-clock="${code}"]`).textContent.startsWith('Playing'), room.code);
+  const response = page.waitForResponse(r => r.url().includes('/api/tables'));
+  f.releasePoll(); await (await response).finished(); await page.evaluate(() => new Promise(requestAnimationFrame));
+  assert.equal(await page.locator('.hand-scroll [data-card]').count(), 13);
+  assert.match(await page.locator(`[data-table-clock="${room.code}"]`).innerText(), /^Playing/);
+  assert.deepEqual(f.errors, []);
 });

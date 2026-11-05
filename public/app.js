@@ -6,7 +6,7 @@ const ranks = { 0: 'JK', 1: 'A', 11: 'J', 12: 'Q', 13: 'K' };
 let session, state, busy = false, polling = false, failures = 0, mode = 'create', groups = [], selected = new Set(), chatDraft = '', clockOffset = 0;
 let lastCode = '', confirmAction;
 let connection = 'connected';
-let tables = [], tableLimit = 3;
+let tables = [], tableLimit = 3, tableEpoch = 0;
 const tableUi = new Map();
 let openGamePanel = null, declarationError = '';
 let tutorialIndex = 0;
@@ -186,7 +186,7 @@ function tablePicker() {
 }
 async function switchTable(code) {
   if (busy || connection !== 'connected' || code === state?.code) return;
-  stashTableUi(); busy = true; setConnection('syncing');
+  stashTableUi(); tableEpoch++; busy = true; setConnection('syncing');
   document.querySelector('#game-dialog').close();
   try {
     const result = await request(`/api/tables?code=${encodeURIComponent(code)}`); acceptTableList(result);
@@ -297,7 +297,7 @@ function syncControls(fresh = false) {
 function setConnection(next) { connection = next; syncControls(); }
 async function action(actionName, extra = {}) {
   if (busy || !state || connection !== 'connected') return false;
-  busy = true; syncControls();
+  tableEpoch++; busy = true; syncControls();
   try {
     const result = await request('/api/action', { code: state.code, version: state.version, action: actionName, ...extra });
     if (actionName === 'arrange') {
@@ -323,18 +323,18 @@ async function action(actionName, extra = {}) {
 }
 async function poll() {
   if ((!state && !tables.length) || polling || busy) return;
-  polling = true; const code = state?.code;
+  polling = true; const code = state?.code, epoch = tableEpoch;
   if (connection !== 'connected') setConnection('syncing');
   try {
     const result = await request(`/api/tables${code ? `?code=${encodeURIComponent(code)}` : ''}`);
-    if (busy || code !== state?.code) return;
+    if (busy || epoch !== tableEpoch || code !== state?.code) return;
     failures = 0; acceptTableList(result);
     if (result.active) accept(result.active);
     else if (state) { stashTableUi(); tableUi.delete(code); tablePicker(); toast('Your selected table closed. Choose another table.', true); }
     else if (!tables.length) tablePicker();
     setConnection('connected');
   } catch (e) {
-    if (busy || code !== state?.code) return;
+    if (busy || epoch !== tableEpoch || code !== state?.code) return;
     if (++failures === 2) toast('Connection interrupted. Reconnecting automatically…', true);
     setConnection('reconnecting');
   } finally { polling = false; }
@@ -415,7 +415,7 @@ app.addEventListener('submit', async event => {
     const data = Object.fromEntries(new FormData(event.target));
     if (authMode === 'register' && data.password !== data.confirmPassword) { toast('Your passwords do not match.', true); return; }
     delete data.confirmPassword;
-    authBusy = true; busy = true;
+    tableEpoch++; authBusy = true; busy = true;
     const button = event.target.querySelector('[type="submit"]'); button.disabled = true;
     const text = button.textContent; button.textContent = authMode === 'register' ? 'Creating your profile…' : 'Signing you in…';
     try {
@@ -432,7 +432,7 @@ app.addEventListener('submit', async event => {
     return;
   }
   if (event.target.id !== 'entry-form' || busy) return;
-  busy = true;
+  tableEpoch++; busy = true;
   const button = event.target.querySelector('[type="submit"]'); button.disabled = true; button.textContent = 'Setting your seat…';
   const data = Object.fromEntries(new FormData(event.target));
   try {
@@ -463,7 +463,7 @@ document.addEventListener('click', event => {
 document.querySelector('#table-entry-form').addEventListener('submit', async event => {
   event.preventDefault(); if (busy || connection !== 'connected') return;
   const data = Object.fromEntries(new FormData(event.target));
-  stashTableUi(); busy = true; syncControls();
+  stashTableUi(); tableEpoch++; busy = true; syncControls();
   document.querySelector('#table-entry-error').textContent = '';
   try {
     const room = await request(tableEntryMode === 'create' ? '/api/create' : '/api/join', data);
@@ -492,7 +492,7 @@ document.querySelector('#profile-dialog').addEventListener('click', async event 
   if (target.dataset.history !== undefined) return loadProfile(Number(target.dataset.history));
   if (target.id === 'sign-out') {
     if (busy || authBusy) return;
-    busy = true; target.disabled = true;
+    tableEpoch++; busy = true; target.disabled = true;
     try {
       session = await request('/api/logout', { logout: true });
       document.querySelector('#profile-dialog').close(); state = null; lastCode = ''; selected.clear(); groups = []; chatDraft = ''; tables = []; tableUi.clear();

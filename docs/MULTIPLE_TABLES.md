@@ -39,3 +39,14 @@ to table/round. Switching retrieves a new authorized snapshot and is blocked whi
 a command is pending. Adding a table uses a modal create/join form; leaving or
 expiration opens a table picker instead of silently choosing another active game.
 The selected table is recovered from the URL/browser hint when still joined.
+
+Client milestone workflow passed all 14 browser regressions plus the full PHP/HTTP
+suite and both release builds:
+https://github.com/mastergrok-technologies/m-rummy/actions/runs/42030198062
+
+The final regression milestone adds HTTP restart coverage for all memberships and
+an intentionally delayed aggregate poll. A client request epoch discards poll
+results started before a command/navigation/authentication change, so late metadata
+cannot undo newer turn badges or table membership. The previous same-table version
+check continues to protect hand snapshots. No production deployment is triggered
+by these feature-branch pushes.
