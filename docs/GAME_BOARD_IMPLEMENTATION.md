@@ -81,3 +81,24 @@ CI's new keyboard checks exposed a dialog Tab-wrap escape; explicit Tab/Shift+Ta
 wrapping now complements native modal behavior. Added tutorial and round/stale
 snapshot regressions. Local JavaScript syntax and helper tests pass; final complete
 workflow results are recorded below after the pushed milestone is checked.
+
+## Verified delivery
+
+[GitHub Actions run 42027142648](https://github.com/mastergrok-technologies/m-rummy/actions/runs/42027142648)
+validated implementation commit a4b0c6b4361fe9d0db6eb39660a8c62cb0b04699:
+
+- `npm run check`: JavaScript/PHP syntax and deployment shell checks pass.
+- `npm test`: all presentation helper, existing PHP rules/account/deployment and
+  HTTP multiplayer/reconnect regression checks pass.
+- `npm run test:ui`: 9/9 Chromium tests pass, including 390×844, 768×1024,
+  1024×768 and 1920×1080; keyboard modal containment, privacy, chat escaping,
+  pending action guards, reconnect draft retention, tutorial navigation and
+  round/stale-snapshot handling are covered.
+- Hostinger upload ZIP and verified SSH release are both built successfully.
+- Local and pushed source trees were compared and match.
+
+This completes supported functional milestones. Exact Figma styling/assets,
+reference-image comparison, multi-table play, a declaration response phase,
+server presence, and the ambiguous bet modal are not implemented. They remain
+blocked by missing design evidence or explicit engine capability gaps listed
+above. No production merge or deployment is included in this branch delivery.
