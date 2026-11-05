@@ -36,10 +36,12 @@ bounds, live turn changes and a complete draw/select/discard flow. Screenshots
 are published with the existing CI artifact. Existing waiting-room, pending,
 reconnect, multi-table, chat, tutorial and game rule checks remain in the suite.
 
-PHP is absent locally and Chromium cannot launch because socket creation is
-restricted. Full validation and screenshot review must therefore run in GitHub
-Actions after the branch is pushed; these are pending until a successful run is
-recorded here.
+Initial validation at commit `513bcb1a3c895d363938c1ccf1e4db3e5a780096`:
+[CI run 42079145025](https://github.com/mastergrok-technologies/m-rummy/actions/runs/42079145025)
+passed syntax, all PHP/API/helper regressions, 26/26 Chromium tests and both
+release builds. Screenshot review at all four sizes found faint seat metadata
+and profile points, corrected in a follow-up contrast pass. Final CI and image
+review for that pass are recorded in the pull request.
 
 Next UI pages: connection/user-state overlays, then chat/settings/information
 panels and tutorial styling. A server match countdown and declaration-response
