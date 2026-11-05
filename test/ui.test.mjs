@@ -654,6 +654,7 @@ test('settings remain usable offline and a completed round unlocks last deal wit
   await page.waitForFunction(() => !document.querySelector('[data-settings-panel="lastDeal"]').disabled);
   assert.equal(await element.evaluate(el => el === document.activeElement), true);
   await page.locator('[data-settings-panel="lastDeal"]').click();
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'game-panel-title');
   assert.match(await page.locator('.last-deal-summary').innerText(), /<img src=x/);
   assert.equal(await page.locator('#game-dialog .card, #game-dialog script').count(), 0);
   assert.equal(await page.locator('#game-dialog img').count(), 1);
@@ -666,7 +667,9 @@ test('settings remain usable offline and a completed round unlocks last deal wit
     await page.setViewportSize({ width: 1920, height: 1080 });
   }
   await page.getByRole('button', { name: 'Back to settings', exact: true }).click();
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'game-panel-title');
   await page.locator('[data-settings-panel="information"]').click();
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'game-panel-title');
   assert.match(await page.locator('#game-dialog').innerText(), /60 seconds/);
   await page.getByRole('button', { name: 'Back to settings', exact: true }).click();
   f.setOffline(true); await page.evaluate(() => window.dispatchEvent(new Event('offline')));

@@ -298,6 +298,9 @@ function showGamePanel(panel, fromSettings = false) {
   if (panel === 'chat') chatComposerMode = 'replies';
   document.querySelector('#game-panel-content').innerHTML = ''; renderGamePanel();
   const dialog = document.querySelector('#game-dialog');
+  if (dialog.open && (fromSettings || panel === 'settings')) {
+    const heading = document.querySelector('#game-panel-title'); heading.tabIndex = -1; heading.focus();
+  }
   if (!dialog.open) dialog.showModal();
   if (panel === 'chat') { const messages = document.querySelector('#dialog-messages'); messages.scrollTop = messages.scrollHeight; }
 }
