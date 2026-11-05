@@ -524,6 +524,18 @@
       "node": "11:82803",
       "method": "Original vector paths and paints with instance-derived 40px geometry/transforms",
       "sha256": "bdc2d73c248159d2025bedfddab6ccd0bdcfa68a4418e9cafa35c564c6a3a8fa"
+    },
+    {
+      "path": "public/assets/figma/info-title.svg",
+      "node": "11:62143",
+      "method": "Original source geometry/gradient paints; close instance 40px geometry and referenced local style resolved",
+      "sha256": "4d026a7bb039deb77d5306649d2c5095ab36b2d2a52a9d24790cb1a5af0ac073"
+    },
+    {
+      "path": "public/assets/figma/info-close.svg",
+      "node": "11:62148",
+      "method": "Original source geometry/gradient paints; close instance 40px geometry and referenced local style resolved",
+      "sha256": "76e35451243538906e26df86c9ebdac5e2050318e9fa94843d052e1abe93a451"
     }
   ],
   "screens": [
@@ -787,6 +799,22 @@
       "Music is displayed as unavailable because there is no audio system",
       "Existing roomy-cards and reduced-motion preferences remain with accessible native checkbox switches",
       "Larger responsive menu accommodates live descriptions and display preferences; source fonts use platform fallback"
+    ]
+  },
+  "informationScreen": {
+    "frame": "11:65307",
+    "component": "11:62103",
+    "backgroundNode": "11:62105",
+    "background": "#d8d9d9",
+    "label": "#031710",
+    "value": "#676767 (darkened to #4d5651 for live text contrast)",
+    "titleNode": "11:62143",
+    "adaptations": [
+      "Original title plate scales proportionally as a CSS background; original close icon remains 40px",
+      "Facts use real engine rules rather than source pool-rummy sample values",
+      "2 decks with 1 printed joker per deck; 60-second human turns; 20/40 drops; 80-point round penalty cap",
+      "No financial prize, pool-mode or extra-time capability is invented",
+      "Responsive grid and readable system-font fallback; information from Settings retains return navigation"
     ]
   }
 }

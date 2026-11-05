@@ -701,3 +701,69 @@ test('settings explain unavailable browser storage and isolate styling from othe
   await page.keyboard.press('Escape');
   assert.equal(f.requests.length, 0); assert.deepEqual(f.errors, []);
 });
+
+for (const [width, height] of [[390, 844], [768, 1024], [1024, 768], [1920, 1080]]) {
+  test(`game information fits ${width}px and describes supported rules without exposing cards`, async t => {
+    const f = await fixture(t, { width, height }, false, { hasPassword: true }); const { page } = f;
+    await open(page, 'Table info');
+    await page.locator('#game-dialog img').evaluateAll(images => Promise.all(images.map(image => image.decode())));
+    await page.evaluate(async () => { const img = new Image(); img.src = '/assets/figma/info-title.svg'; await img.decode(); if (!img.naturalWidth || !img.naturalHeight) throw Error('Missing information title artwork'); });
+    assert.equal(await page.locator('#game-dialog .card, #game-dialog [data-draw]').count(), 0);
+    const facts = await page.locator('.info-fact').evaluateAll(els => Object.fromEntries(els.map(el => [el.querySelector('dt').textContent, el.querySelector('dd').textContent])));
+    assert.equal(facts['No. of decks'], '2 packs');
+    assert.equal(facts['Printed jokers'], '1 per deck · 2 total');
+    assert.equal(facts['Human turns'], '60 seconds · Server timed');
+    assert.equal(facts['First drop'], '20 penalty points');
+    assert.equal(facts['Middle drop'], '40 penalty points');
+    assert.equal(facts['Maximum round penalty'], '80 points');
+    assert.equal(facts['Stakes'], 'Free play · No money involved');
+    assert.match(facts.Privacy, /Password protected/);
+    assert.match(await page.locator('#game-panel-title').evaluate(el => getComputedStyle(el).backgroundImage), /info-title.svg/);
+    const icon = await page.locator('#game-dialog img[src$="info-close.svg"]').boundingBox();
+    assert.equal(icon.width, 40); assert.equal(icon.height, 40);
+    assert.equal(await page.locator('#game-dialog').evaluate(el => el.scrollWidth <= el.clientWidth), true);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    if (process.env.UI_SCREENSHOT_DIR) {
+      await mkdir(process.env.UI_SCREENSHOT_DIR, { recursive: true });
+      await page.screenshot({ path: resolve(process.env.UI_SCREENSHOT_DIR, `game-information-${width}.png`), fullPage: true });
+    }
+    for (let i = 0; i < 5; i++) { await page.keyboard.press('Tab'); assert.equal(await page.evaluate(() => !!document.activeElement.closest('#game-dialog')), true); }
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#game-dialog').evaluate(el => el.open), false);
+    assert.equal(f.requests.length, 0); assert.deepEqual(f.errors, []);
+  });
+}
+
+test('information facts refresh without losing close-button focus and Settings return navigation works', async t => {
+  const f = await fixture(t); const { page, room } = f;
+  await open(page, 'Settings'); await page.locator('[data-settings-panel="information"]').click();
+  await page.getByRole('button', { name: 'Close table panel', exact: true }).focus();
+  room.players.push(waitingPlayer('newcomer', 'New friend', { count: 13 })); room.round = 2; room.hasPassword = true; room.version++;
+  await page.waitForFunction(() => [...document.querySelectorAll('.info-fact')].some(el => el.querySelector('dt').textContent === 'Players' && el.querySelector('dd').textContent === '3 / 6'));
+  assert.match(await page.locator('.info-facts').innerText(), /Round 2/);
+  assert.match(await page.locator('.info-facts').innerText(), /Password protected/);
+  assert.equal(await page.evaluate(() => document.activeElement.getAttribute('aria-label')), 'Close table panel');
+  await page.getByRole('button', { name: 'Back to settings', exact: true }).click();
+  assert.equal(await page.locator('#game-dialog').getAttribute('data-panel'), 'settings');
+  assert.equal(await page.getByLabel('Reduce motion', { exact: true }).isVisible(), true);
+  await page.keyboard.press('Escape'); await open(page, 'Chat');
+  assert.equal(await page.locator('#game-dialog').getAttribute('data-panel'), 'chat');
+  assert.equal(await page.locator('.info-facts').count(), 0);
+  assert.equal(f.requests.length, 0); assert.deepEqual(f.errors, []);
+});
+
+test('information follows the selected table and its waiting state', async t => {
+  const f = await fixture(t, { width: 390, height: 844 }, true, { hasPassword: true }); const { page, rooms } = f;
+  const second = rooms.get('BBBBBB123456'); second.hasPassword = false; second.status = 'lobby'; second.round = 0; second.hand = []; second.version++;
+  await open(page, 'Table info');
+  assert.match(await page.locator('.info-room-summary').innerText(), /ABCDEF123456/);
+  assert.match(await page.locator('.info-facts').innerText(), /Password protected/);
+  await page.keyboard.press('Escape');
+  await page.locator('[data-switch-table="BBBBBB123456"]').click(); await page.locator('.waiting-page').waitFor();
+  await open(page, 'Table info');
+  assert.match(await page.locator('.info-room-summary').innerText(), /BBBBBB123456/);
+  assert.equal(await page.locator('#info-status').innerText(), 'Waiting for players');
+  assert.match(await page.locator('.info-facts').innerText(), /Not started/);
+  assert.doesNotMatch(await page.locator('#game-panel-content').innerText(), /ABCDEF123456|Password protected/);
+  assert.equal(f.requests.length, 0); assert.deepEqual(f.errors, []);
+});
