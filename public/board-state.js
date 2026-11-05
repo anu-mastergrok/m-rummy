@@ -22,3 +22,9 @@ export function tableStandings(players) {
   const sorted = [...players].sort((a, b) => a.total - b.total || a.name.localeCompare(b.name));
   return sorted.map((player, index) => ({ ...player, place: sorted.findIndex(p => p.total === player.total) + 1 }));
 }
+
+export function presencePresentation(value) {
+  const labels = { online: 'Connected', away: 'Away', offline: 'Not responding', unknown: 'Status unknown', bot: 'Practice bot', reconnecting: 'Reconnecting' };
+  const status = Object.hasOwn(labels, value) ? value : 'unknown';
+  return { status, label: labels[status] };
+}

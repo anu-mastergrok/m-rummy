@@ -1,5 +1,5 @@
 import { tutorialSteps } from './tutorial.js';
-import { remainingSeconds, reconcileGroups, tableStandings } from './board-state.js';
+import { remainingSeconds, reconcileGroups, tableStandings, presencePresentation } from './board-state.js';
 const app = document.querySelector('#app');
 const suits = { S: '♠', H: '♥', D: '♦', C: '♣', J: '✦' };
 const ranks = { 0: 'JK', 1: 'A', 11: 'J', 12: 'Q', 13: 'K' };
@@ -8,6 +8,8 @@ let lastCode = '', confirmAction;
 let connection = 'connected';
 let tables = [], tableLimit = 3, tableEpoch = 0;
 const tableUi = new Map();
+const presenceClient = [...crypto.getRandomValues(new Uint8Array(16))].map(n => n.toString(16).padStart(2, '0')).join('');
+let presenceSequence = 0;
 let openGamePanel = null, declarationError = '';
 let tutorialIndex = 0;
 let preferences = {};
@@ -30,6 +32,13 @@ function toast(text, error = false) {
   clearTimeout(toast.timer); toast.timer = setTimeout(() => { el.className = ''; }, 5500);
 }
 async function request(path, data) {
+  if (path === '/api/tables' || path.startsWith('/api/tables?')) {
+    const url = new URL(path, location.origin);
+    url.searchParams.set('client', presenceClient);
+    url.searchParams.set('visible', document.hidden ? '0' : '1');
+    url.searchParams.set('sequence', String(++presenceSequence));
+    path = url.pathname + url.search;
+  }
   const response = await fetch(path, {
     method: data === undefined ? 'GET' : 'POST', credentials: 'same-origin', cache: 'no-store',
     headers: data === undefined ? {} : { 'Content-Type': 'application/json', 'X-CSRF-Token': session?.csrf || '' },
@@ -59,7 +68,7 @@ function accept(next) {
   selected = new Set([...selected].filter(id => next.hand.some(c => c.id === id)));
   groups = reconcileGroups(groups, next.hand);
   if (changed) renderRoom();
-  updateClock(); renderTableSwitcher(); syncControls(); renderGamePanel();
+  updateClock(); renderTableSwitcher(); syncControls(); if (changed) renderGamePanel();
 }
 function landing() {
   state = null; selected.clear(); groups = [];
@@ -123,11 +132,11 @@ function renderRoom() {
   app.innerHTML = `<div class="room-heading"><div><div class="eyebrow">YOUR PRIVATE CLUB <span class="connection" id="connection">● Connected</span></div><h1>The friends’ table<span class="round-badge">${state.round ? `Round ${state.round}` : 'Waiting room'}</span></h1></div><div class="button-row"><button class="button secondary small" data-action="invite">Invite friends <span>↗</span></button><button class="icon-button leave-button" data-action="leave" aria-label="Leave table" title="Leave table">⇥</button></div></div>
   <div id="table-switcher"></div><nav class="board-toolbar" aria-label="Table tools"><button class="button secondary small" data-action="tutorial">Learn rummy</button><button class="button secondary small" data-panel="chat">Chat</button><button class="button secondary small" data-panel="hand" ${!state.hand.length ? 'disabled' : ''}>View cards</button><button class="button secondary small" data-panel="standings">Standings</button><button class="button secondary small" data-panel="information">Table info</button><button class="button secondary small" data-panel="settings">Settings</button></nav>
   <div id="connection-banner" class="connection-banner" role="status" hidden></div><div id="command-status" class="sr-only" role="status"></div>
-  <div class="game-layout"><section class="table-column"><div class="felt-table"><div class="felt-top"><span>13-CARD INDIAN RUMMY</span><span class="room-code">ROOM ${state.code} ${state.hasPassword ? '· LOCKED' : ''}</span></div><div class="seats">${state.players.filter(p => p.id !== state.me).map(p => `<div class="seat ${playing && state.turn === p.id ? 'active' : ''} ${p.dropped ? 'dropped' : ''}"><div class="avatar">${p.bot ? '✦' : esc(p.name.slice(0, 1).toUpperCase())}</div><strong>${esc(p.name)}</strong><span>${p.bot ? 'Practice bot' : p.id === state.host ? 'Table host' : 'Friend'}${p.dropped ? ' · Dropped' : playing ? ` · ${p.count} cards` : ''}</span>${playing && !p.dropped ? '<div class="mini-hand">▥ ▥ ▥ ▥ ▥</div>' : ''}${host && isLobby && p.bot ? `<button class="remove-bot" data-remove="${p.id}">Remove</button>` : ''}</div>`).join('')}${state.players.length < 6 && isLobby ? `<button class="seat empty-seat" data-action="invite"><span class="avatar">+</span><strong>A seat for a friend</strong><span>Share your invite link</span></button>` : ''}</div>
+  <div class="game-layout"><section class="table-column"><div class="felt-table"><div class="felt-top"><span>13-CARD INDIAN RUMMY</span><span class="room-code">ROOM ${state.code} ${state.hasPassword ? '· LOCKED' : ''}</span></div><div class="seats">${state.players.filter(p => p.id !== state.me).map(p => `<div data-player-seat="${esc(p.id)}" class="seat ${playing && state.turn === p.id ? 'active' : ''} ${p.dropped ? 'dropped' : ''}"><div class="avatar">${p.bot ? '✦' : esc(p.name.slice(0, 1).toUpperCase())}</div><strong>${esc(p.name)}</strong><span>${p.bot ? 'Practice bot' : p.id === state.host ? 'Table host' : 'Friend'}${p.dropped ? ' · Dropped' : playing ? ` · ${p.count} cards` : ''}</span><span class="player-presence" data-presence-player="${esc(p.id)}"></span>${playing && !p.dropped ? '<div class="mini-hand">▥ ▥ ▥ ▥ ▥</div>' : ''}${host && isLobby && p.bot ? `<button class="remove-bot" data-remove="${p.id}">Remove</button>` : ''}</div>`).join('')}${state.players.length < 6 && isLobby ? `<button class="seat empty-seat" data-action="invite"><span class="avatar">+</span><strong>A seat for a friend</strong><span>Share your invite link</span></button>` : ''}</div>
   ${state.status === 'lobby' ? `<div class="lobby-center"><span class="table-club">♣</span><h2>Great company.<br>One good game.</h2><p>${host ? 'Invite a friend or add a practice bot to get started.' : 'Make yourself comfortable. Your host will deal shortly.'}</p><div class="button-row">${host ? `<button class="button cream" data-action="start" ${state.players.length < 2 ? 'disabled' : ''}>Deal the first round <span>→</span></button><button class="button felt-outline" data-action="addBot" ${state.players.length >= 6 ? 'disabled' : ''}>+ Practice bot</button>` : '<span class="waiting-label">Waiting for the host to deal…</span>'}</div></div>` : `<div class="deck-area"><div class="pile"><span class="pile-label">CLOSED DECK</span><button class="card card-back" data-draw="stock" ${!myTurn || state.phase !== 'draw' ? 'disabled' : ''} aria-label="Draw from closed deck"><span>♣</span><small>M RUMMY</small></button><span class="pile-caption">${state.stockCount} cards</span></div><div class="pile"><span class="pile-label">OPEN DECK</span><button class="open-pile" data-draw="discard" ${!myTurn || state.phase !== 'draw' || !state.topDiscard || [0, state.wildRank].includes(state.topDiscard.rank) ? 'disabled' : ''} aria-label="Draw from open deck">${state.topDiscard ? card(state.topDiscard) : '<span class="empty-card">Empty</span>'}</button><span class="pile-caption">${state.topDiscard && [0, state.wildRank].includes(state.topDiscard.rank) ? 'Joker · cannot pick' : 'Take the top card'}</span></div><div class="wild-indicator"><span class="pile-label">WILD JOKER</span>${card(state.indicator)}<span class="pile-caption">All ${ranks[state.wildRank] || state.wildRank}s are wild</span></div></div>`}
   <div class="table-status"><span class="status-dot"></span><span>${esc(turnText())}</span>${playing ? '<span id="turn-clock" class="turn-clock"></span>' : ''}</div></div>
   ${state.status === 'finished' ? `<section class="results"><div class="results-title"><span class="eyebrow">ROUND ${state.round} · ${state.result.reason === 'last-player' ? 'LAST PLAYER STANDING' : 'VALID DECLARATION'}</span><h2>${esc(state.result.winnerName)} wins <span>✦</span></h2>${state.result.pointsAward ? `<p class="win-points">${state.result.pointsAward.amount ? `+${number(state.result.pointsAward.amount)} play points credited to ${esc(state.result.winnerName)}’s profile` : 'No profile points awarded for this round'}</p>` : ''}</div><div class="score-table-wrap"><table class="score-table"><thead><tr><th>Player</th><th>Round penalty</th><th>Penalty total ↓</th></tr></thead><tbody>${state.result.scores.map(p => `<tr class="${p.id === state.result.winner ? 'winner-row' : ''}"><td>${esc(p.name)} ${p.id === state.result.winner ? '♣' : p.dropped ? '<small>Dropped</small>' : ''}</td><td>${p.penalty}</td><td>${p.total}</td></tr>`).join('')}</tbody></table></div>${state.result.groups.length ? `<details class="winner-hand"><summary>See the winning groups</summary>${state.result.groups.map(g => `<div><span>${g.type === 'pure' ? 'Pure sequence' : g.type === 'set' ? 'Set' : 'Sequence'}</span><div class="cards">${g.ids.map(id => card(state.result.scores.find(p => p.id === state.result.winner).hand.find(c => c.id === id))).join('')}</div></div>`).join('')}</details>` : ''}<div class="button-row">${host ? '<button class="button primary" data-action="start">Deal another round →</button>' : '<p>Waiting for the host to deal again.</p>'}${host && state.players.length < 6 ? '<button class="button secondary" data-action="addBot">+ Practice bot</button>' : ''}</div></section>` : ''}
-  <section class="hand-panel"><div class="hand-header"><div><span class="eyebrow">${esc(me.name)} ${host ? '· HOST' : ''}</span><h2>Your hand <span>${state.hand.length} cards${me.dropped ? ' · Dropped' : ''}</span></h2></div><div class="hand-tools"><button class="text-button" data-action="sort" ${!state.hand.length ? 'disabled' : ''}>Sort ↕</button><button class="text-button" data-action="arrange" ${!state.hand.length ? 'disabled' : ''}>Auto-group ✦</button><button class="text-button" data-action="group" ${selected.size < 3 ? 'disabled' : ''}>Group (${selected.size})</button></div></div><div class="hand-scroll">${state.hand.length ? `${groups.map((g, i) => groupView(g.ids, g.title || `Group ${i + 1}`, i)).join('')}${loose.length ? groupView(loose.map(c => c.id), groups.length ? 'Ungrouped' : 'Tap cards to select · group 3 or more') : ''}` : '<div class="hand-placeholder"><span>♠ ♥ ♣ ♦</span><p>Your 13 cards will be right here when the round starts.</p></div>'}</div><div class="hand-footer"><span class="hand-hint">${me.dropped ? 'You’re watching this round. You’ll be back in the next one.' : canDiscard ? selected.size === 1 ? 'One card selected. Discard it, or declare if the rest of your hand is ready.' : 'Select one card for your discard.' : myTurn ? 'Pick a card from either deck to begin your turn.' : 'Select cards to make groups while you wait.'}</span><div class="button-row"><button class="button secondary small" data-action="drop" ${!playing || me.dropped || (myTurn && state.phase === 'discard') ? 'disabled' : ''}>Drop · ${me.turns === 0 ? '20' : '40'}</button><button class="button secondary small" data-action="discard" ${!canDiscard || selected.size !== 1 ? 'disabled' : ''}>Discard</button><button class="button primary small" data-action="declare" ${!canDiscard || selected.size !== 1 ? 'disabled' : ''}>Declare ↗</button></div></div></section></section>
+  <section class="hand-panel"><div class="hand-header"><div><span class="eyebrow">${esc(me.name)} ${host ? '· HOST' : ''}</span><h2>Your hand <span>${state.hand.length} cards${me.dropped ? ' · Dropped' : ''}</span></h2><span class="player-presence" data-presence-player="${esc(me.id)}"></span></div><div class="hand-tools"><button class="text-button" data-action="sort" ${!state.hand.length ? 'disabled' : ''}>Sort ↕</button><button class="text-button" data-action="arrange" ${!state.hand.length ? 'disabled' : ''}>Auto-group ✦</button><button class="text-button" data-action="group" ${selected.size < 3 ? 'disabled' : ''}>Group (${selected.size})</button></div></div><div class="hand-scroll">${state.hand.length ? `${groups.map((g, i) => groupView(g.ids, g.title || `Group ${i + 1}`, i)).join('')}${loose.length ? groupView(loose.map(c => c.id), groups.length ? 'Ungrouped' : 'Tap cards to select · group 3 or more') : ''}` : '<div class="hand-placeholder"><span>♠ ♥ ♣ ♦</span><p>Your 13 cards will be right here when the round starts.</p></div>'}</div><div class="hand-footer"><span class="hand-hint">${me.dropped ? 'You’re watching this round. You’ll be back in the next one.' : canDiscard ? selected.size === 1 ? 'One card selected. Discard it, or declare if the rest of your hand is ready.' : 'Select one card for your discard.' : myTurn ? 'Pick a card from either deck to begin your turn.' : 'Select cards to make groups while you wait.'}</span><div class="button-row"><button class="button secondary small" data-action="drop" ${!playing || me.dropped || (myTurn && state.phase === 'discard') ? 'disabled' : ''}>Drop · ${me.turns === 0 ? '20' : '40'}</button><button class="button secondary small" data-action="discard" ${!canDiscard || selected.size !== 1 ? 'disabled' : ''}>Discard</button><button class="button primary small" data-action="declare" ${!canDiscard || selected.size !== 1 ? 'disabled' : ''}>Declare ↗</button></div></div></section></section>
   <aside class="sidebar"><section class="side-card"><div class="side-heading"><h2>Table talk</h2><span>${state.players.length}/6 seated</span></div><div class="messages" id="messages">${state.messages.length ? state.messages.map(m => `<div class="message"><span>${esc(m.name)} <time>${new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></span><p>${esc(m.text)}</p></div>`).join('') : '<div class="empty-chat"><span>“</span><p>The best part of cards?<br>The conversation.</p><small>Say hello to your table.</small></div>'}</div><form class="chat-form" id="chat-form"><label class="sr-only" for="chat-input">Message your table</label><input id="chat-input" maxlength="240" placeholder="Say something…" required autocomplete="off" value="${esc(chatDraft)}"><button type="submit" aria-label="Send message">↑</button></form></section><section class="side-card activity"><div class="side-heading"><h2>At the table</h2><span class="live-dot">LIVE</span></div><div>${state.activity.slice(0, 7).map(a => `<p><span></span>${esc(a.text)}</p>`).join('')}</div></section><section class="table-tip"><span>✧ THE WINNING HAND</span><p>Two sequences.<br>One of them pure.<br><em>The rest is up to you.</em></p><button class="text-button" data-action="rules">A quick rules refresher ↗</button></section>${state.history.length > 1 ? `<details class="side-card history"><summary>Previous rounds</summary>${state.history.slice(1).map(h => `<p>Round ${h.round} <strong>${esc(h.winner)}</strong></p>`).join('')}</details>` : ''}</aside></div>`;
   const messageBox = document.querySelector('#messages'); if (messageBox) messageBox.scrollTop = messageBox.scrollHeight;
   if (focus === 'chat-input') { const input = document.querySelector('#chat-input'); input.focus(); input.setSelectionRange(selectionStart, selectionStart); }
@@ -247,7 +256,7 @@ function renderGamePanel() {
   } else if (openGamePanel === 'standings') {
     content.innerHTML = `<p>Current table only. Lower cumulative penalty points rank higher. Tied scores share a place. Profile play points are separate.</p><div class="score-table-wrap"><table class="score-table"><caption class="sr-only">Cumulative table penalties</caption><thead><tr><th scope="col">Place / Player</th><th scope="col">Penalty total ↓</th></tr></thead><tbody>${tableStandings(state.players).map(p => `<tr><td>${p.place}. ${esc(p.name)}${p.bot ? ' · Bot' : ''}${p.id === state.me ? ' · You' : ''}</td><td>${number(p.total)}</td></tr>`).join('')}</tbody></table></div>${state.status === 'finished' ? `<h3>Revealed round hands</h3><div class="inspect-hand">${state.result.scores.map(p => `<section><h3>${esc(p.name)}</h3><div class="cards">${p.hand.map(c => card(c)).join('')}</div></section>`).join('')}</div>` : ''}`;
   } else if (openGamePanel === 'information') {
-    content.innerHTML = `<dl class="table-facts"><dt>Room</dt><dd>${esc(state.code)}</dd><dt>Game</dt><dd>13-card Indian rummy · Two packs</dd><dt>Players</dt><dd>${state.players.length} / 6</dd><dt>Round</dt><dd>${state.round || 'Not started'}</dd><dt>Status</dt><dd>${esc(state.status)}</dd><dt>Privacy</dt><dd>Invite only${state.hasPassword ? ' · Password protected' : ''}</dd><dt>Stakes</dt><dd>Free play · No money involved</dd><dt>Human turns</dt><dd>60 seconds · Server timed</dd></dl><p>Form at least two sequences including one pure sequence, and valid groups throughout. Invalid declarations leave your hand and turn open. First drop: 20 penalty points; later drop: 40. Round penalty is capped at 80.</p>`;
+    content.innerHTML = `<dl class="table-facts"><dt>Room</dt><dd>${esc(state.code)}</dd><dt>Game</dt><dd>13-card Indian rummy · Two packs</dd><dt>Players</dt><dd>${state.players.length} / 6</dd><dt>Round</dt><dd>${state.round || 'Not started'}</dd><dt>Status</dt><dd>${esc(state.status)}</dd><dt>Privacy</dt><dd>Invite only${state.hasPassword ? ' · Password protected' : ''}</dd><dt>Stakes</dt><dd>Free play · No money involved</dd><dt>Human turns</dt><dd>60 seconds · Server timed</dd></dl><p>Form at least two sequences including one pure sequence, and valid groups throughout. Invalid declarations leave your hand and turn open. Connection badges are status hints; timers keep running while a player is away or not responding. First drop: 20 penalty points; later drop: 40. Round penalty is capped at 80.</p>`;
   } else if (openGamePanel === 'settings') {
     content.innerHTML = `<p>Display preferences are saved on this browser.</p><label class="preference"><input type="checkbox" data-preference="roomyCards" ${preferences.roomyCards ? 'checked' : ''}><span>Spread out hand cards<small>Less overlap; scroll sideways to see the full hand.</small></span></label><label class="preference"><input type="checkbox" data-preference="quietMotion" ${preferences.quietMotion ? 'checked' : ''}><span>Reduce motion<small>Your device’s reduced-motion preference is also respected.</small></span></label>`;
   } else if (openGamePanel === 'declaration') {
@@ -256,6 +265,19 @@ function renderGamePanel() {
   if (focused === 'dialog-chat-input') {
     const input = content.querySelector('#dialog-chat-input');
     input?.focus(); input?.setSelectionRange(cursor, cursor);
+  }
+}
+function updatePresence() {
+  if (!state) return;
+  for (const badge of document.querySelectorAll('[data-presence-player]')) {
+    const player = state.players.find(p => p.id === badge.dataset.presencePlayer);
+    if (!player) continue;
+    const value = player.bot ? 'bot' : connection !== 'connected' ? player.id === state.me ? 'reconnecting' : 'unknown' : player.presence;
+    const { status, label } = presencePresentation(value);
+    // A heartbeat changes these nodes only, preserving hand and chat focus.
+    if (badge.textContent !== label) badge.textContent = label;
+    badge.dataset.presence = status;
+    badge.setAttribute('aria-label', `${player.name}: ${label}`);
   }
 }
 function syncControls(fresh = false) {
@@ -274,6 +296,7 @@ function syncControls(fresh = false) {
     if (fresh || !button.dataset.legal) button.dataset.legal = button.disabled ? 'no' : 'yes';
     button.disabled = busy || button.dataset.legal === 'no';
   });
+  updatePresence();
   app.setAttribute('aria-busy', String(busy));
   const indicator = document.querySelector('#connection');
   if (indicator) {
@@ -536,7 +559,11 @@ async function boot() {
   } catch (e) { app.innerHTML = '<div class="boot-error"><h1>The table is taking a moment.</h1><p>Check your connection and reload to try again.</p><button class="button primary" id="retry">Try again</button></div>'; document.querySelector('#retry').onclick = boot; toast(e.message, true); }
 }
 setInterval(poll, 1200); setInterval(updateClock, 500);
-document.addEventListener('visibilitychange', () => { if (!document.hidden && (state || tables.length)) { setConnection('syncing'); poll(); } });
+document.addEventListener('visibilitychange', () => {
+  if (!state && !tables.length) return;
+  if (!document.hidden) setConnection('syncing');
+  poll();
+});
 window.addEventListener('offline', () => setConnection('reconnecting'));
 window.addEventListener('online', () => { if (state || tables.length) { setConnection('syncing'); poll(); } });
 boot();

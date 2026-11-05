@@ -73,6 +73,18 @@ test('HTTP multiplayer, isolation, CSRF, competing moves, reconnect, and durable
   const joined = await request(b, 'join', { code, name: 'Friend', password: 'friends' }); assert.equal(joined.status, 200);
   const blocked = await request(outsider, `room?code=${code}`); assert.equal(blocked.status, 400); assert.equal(blocked.body.hand, undefined);
   const state = (await request(a, `room?code=${code}`)).body;
+  const heartbeat = (user, client, visible, sequence) => request(user, `tables?code=${code}&client=${client.repeat(32)}&visible=${visible}&sequence=${sequence}`);
+  const live = await heartbeat(a, 'a', 1, 1); assert.equal(live.status, 200);
+  assert.equal(live.body.active.players.find(p => p.id === a.id).presence, 'online');
+  assert.equal(live.body.active.version, state.version); assert.equal(live.body.active.deadline, state.deadline);
+  await heartbeat(b, 'b', 0, 1);
+  const observed = (await request(a, `room?code=${code}`)).body;
+  assert.equal(observed.players.find(p => p.id === b.id).presence, 'away');
+  assert.equal(observed.version, state.version);
+  for (const secret of ['presenceClients', 'presenceSeen', 'seenAt', 'sequence', a.cookie.split('=')[1]]) assert.ok(!JSON.stringify(observed).includes(secret));
+  assert.equal((await request(a, `tables?code=${code}&client=bad&visible=1&sequence=2`)).status, 400);
+  assert.equal((await request(a, `tables?code=${code}`)).body.active.version, state.version);
+
   assert.equal((await request(a, 'action', { code, action: 'award', amount: 1000000, version: state.version })).status, 400);
   assert.equal((await request(a, 'profile')).body.points, 10000);
   assert.equal((await request(a, 'action', { code, action: 'start', version: state.version }, { 'X-CSRF-Token': 'bad' })).status, 403);
@@ -116,6 +128,9 @@ test('HTTP multiplayer, isolation, CSRF, competing moves, reconnect, and durable
   assert.equal((await request(c, 'login', { username: 'sunil_test', password: 'incorrect-password' })).status, 400);
   const crossDevice = await request(c, 'login', { username: 'SUNIL_TEST', password: 'password-for-test-only' });
   assert.equal(crossDevice.body.id, a.id); assert.equal(crossDevice.body.room, code); assert.equal(crossDevice.body.account.points, 10100);
+  await heartbeat(a, 'a', 0, 2); await heartbeat(c, 'c', 1, 1);
+  assert.equal((await request(b, `room?code=${code}`)).body.players.find(p => p.id === a.id).presence, 'online');
+
   const authenticatedCookie = c.cookie;
   await request(c, 'logout', { logout: true });
   assert.equal((await request({ ...c, cookie: authenticatedCookie }, 'profile')).status, 401);

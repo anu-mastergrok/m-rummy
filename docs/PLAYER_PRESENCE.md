@@ -35,3 +35,21 @@ not published. No new schema migration or endpoint is required.
 2. Client visibility reporting and seat/own-hand status badges that update without
    replacing cards or losing chat focus on every heartbeat.
 3. HTTP privacy/version compatibility and browser reconnect/background regression.
+
+## Validation progress
+
+The server milestone passed six deterministic presence tests and all existing
+PHP/HTTP/browser/release checks:
+https://github.com/mastergrok-technologies/m-rummy/actions/runs/42031394157
+
+Client updates add labelled badges to opponent seats and the own-hand header.
+Presence-only snapshots update those nodes while preserving card DOM, selections,
+chat input and cursor. Losing the local connection shows “Reconnecting” for self
+and “Status unknown” for other humans until an authoritative resync. Bot badges
+remain explicit. Visibility changes report hidden/foreground state through the
+existing poll; refresh creates a distinct document ID.
+
+New browser coverage checks presence transitions at an unchanged game version,
+DOM/focus retention, heartbeat identity/order, visibility changes, reload and
+network loss/recovery. HTTP checks verify status enums, private metadata omission,
+malformed update rejection, unchanged game versions and multi-device aggregation.
