@@ -336,3 +336,48 @@ button.settings-option:disabled .settings-option-icon{opacity:.55}
 #game-dialog[data-panel=information] :is(button,[tabindex]):focus-visible{outline:3px solid #083827;outline-offset:3px}
 @media(max-width:700px){#game-dialog[data-panel=information]{padding:18px 20px;border-radius:20px}#game-dialog[data-panel=information] .info-facts{grid-template-columns:repeat(2,minmax(0,1fr))}.info-fact{padding:16px 14px}.info-fact:nth-child(3n){border-right:1px solid #b9bfbb}.info-fact:nth-child(2n){border-right:0}#game-dialog[data-panel=information] .info-fact dt{font-size:13px}#game-dialog[data-panel=information] .info-fact dd{font-size:12px}#game-dialog[data-panel=information] h2{min-height:76px;margin:0 auto 16px;padding:12px 20px 18px;font-size:26px}}
 @media(max-width:450px){#game-dialog[data-panel=information]{width:calc(100vw - 24px);max-height:calc(100dvh - 24px);padding:16px 14px}#game-dialog[data-panel=information] h2{min-height:58px;font-size:23px;letter-spacing:-.4px;padding:10px 14px 14px}.info-fact{padding:14px 10px}.info-room-summary{font-size:10px;gap:8px}.info-status{font-size:10px;padding:5px 9px}#game-dialog[data-panel=information] .info-rules{padding:14px;margin-top:18px}}
+
+/* Standings: source Leaderboard / Winner Layout 11:62149, frame 11:65148. */
+#game-dialog[data-panel=standings]{width:min(1100px,calc(100vw - 32px));max-width:none;max-height:calc(100dvh - 32px);padding:24px 28px 0;border:2px solid #fff;border-radius:26px;background:#d8d9d9;color:#1b1b1b;font-family:'SF Pro Display',-apple-system,BlinkMacSystemFont,var(--sans)}
+#game-dialog[data-panel=standings] .dialog-head{margin-bottom:8px}
+#game-dialog[data-panel=standings] .eyebrow{color:#514c86}
+#game-dialog[data-panel=standings] .dialog-head .icon-button{display:grid;place-items:center;width:48px;height:48px;border:1px solid #bccac0;border-radius:12px;background:#ffffffbb}
+#game-dialog[data-panel=standings] .dialog-head img{display:block}
+#game-dialog[data-panel=standings] h2{font:500 30px/1.3 'SF Pro Display',-apple-system,BlinkMacSystemFont,var(--sans);color:#27245d;letter-spacing:-.4px;margin:0 0 14px}
+.standings-summary{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;font-size:11px;line-height:1.5;color:#514c86;border-top:1px solid #bbbcc7;padding-top:14px}
+.standings-summary strong{letter-spacing:1px;margin-left:7px;color:#27245d}
+#game-dialog[data-panel=standings] .standings-explainer{font-size:12px;line-height:1.8;color:#4d5651;margin:12px 0 20px}
+#game-dialog[data-panel=standings] .standings-table{table-layout:fixed;width:100%;font-size:14px;margin-bottom:0;border-collapse:separate;border-spacing:0}
+#game-dialog[data-panel=standings] .standings-table thead th{background:#c2c1d0;color:#06050e;font-size:12px;line-height:1.5;font-weight:500;padding:14px 16px;text-align:right;border:0}
+#game-dialog[data-panel=standings] .standings-table thead th:first-child{width:76px;text-align:center;border-radius:12px 0 0 0}
+#game-dialog[data-panel=standings] .standings-table thead th:nth-child(2){text-align:left}
+#game-dialog[data-panel=standings] .standings-table thead th:nth-child(3){width:115px}
+#game-dialog[data-panel=standings] .standings-table thead th:last-child{width:145px;border-radius:0 12px 0 0}
+#game-dialog[data-panel=standings] .standings-table tbody :is(th,td){padding:16px;border:0;border-bottom:1px solid #b9bfbb;color:#1b1b1b;line-height:1.6;vertical-align:middle;background:#ffffff33}
+#game-dialog[data-panel=standings] .standings-table tbody th{text-align:left;font-weight:400}
+#game-dialog[data-panel=standings] .standings-table tbody .standing-self :is(th,td){background:#e5efe9}
+#game-dialog[data-panel=standings] .standings-table .standing-place{text-align:center;font-size:18px;font-variant-numeric:tabular-nums}
+.standing-place small{display:block;font-size:9px;color:#514c86;line-height:1.5}
+.standing-player{display:flex;align-items:center;gap:14px;min-width:0}
+.standing-avatar{display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;overflow:hidden;border-radius:50%;background:#27245d;color:#fff;font-size:24px}
+.standing-avatar img{display:block;width:100%;height:100%;object-fit:contain}
+.standing-player-text{min-width:0;flex:1}
+.standing-player-text>strong{display:block;font-size:14px;line-height:1.6;font-weight:500;overflow-wrap:anywhere;color:#1b1b1b}
+.standing-labels{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px}
+.standing-labels>span{display:inline-block;font-size:9px;line-height:1.5;border:1px solid #9aaea2;border-radius:12px;padding:2px 6px;color:#40574d}
+.standing-labels>.standing-winner{background:#d4f0e6;border-color:#69a383;color:#083827;font-weight:600}
+#game-dialog[data-panel=standings] .standing-round,#game-dialog[data-panel=standings] .standing-total{font-variant-numeric:tabular-nums;font-size:16px;text-align:right}
+#game-dialog[data-panel=standings] .standing-total{font-weight:600;color:#27245d}
+#game-dialog[data-panel=standings] .standings-privacy{font-size:11px;line-height:1.8;color:#4d5651;margin:16px 0 20px}
+.standings-revealed{margin-top:20px;padding:14px 16px;border:1px solid #b9bfbb;border-radius:12px;background:#f2f5f2}
+.standings-revealed summary{cursor:pointer;font-size:13px;line-height:1.6;color:#27245d;min-height:32px}
+#game-dialog[data-panel=standings] .standings-revealed p{font-size:11px;line-height:1.7;color:#4d5651;margin:10px 0 18px}
+#game-dialog[data-panel=standings] .standings-revealed h3{font:500 16px/1.5 'SF Pro Display',-apple-system,BlinkMacSystemFont,var(--sans);margin:0 0 10px;color:#1b1b1b;overflow-wrap:anywhere}
+#game-dialog[data-panel=standings] .standings-footer{display:flex;align-items:center;justify-content:space-between;gap:20px;background:#414141;color:#f2f5f2;margin:20px -28px 0;padding:18px 28px;border-radius:0 0 24px 24px}
+.standings-footer strong{display:block;font-size:14px;line-height:1.6;font-weight:500}
+.standings-footer span{display:block;font-size:11px;line-height:1.7;color:#e0e3e1;margin-top:3px}
+.standings-footer .button{background:#109e56;color:#fff;border-color:#7fe5ad;min-height:44px;flex-shrink:0}
+#game-dialog[data-panel=standings] :is(button,summary):focus-visible{outline:3px solid #27245d;outline-offset:3px}
+#game-dialog[data-panel=standings] .standings-footer button:focus-visible{outline-color:#b5ffd8}
+@media(max-width:700px){#game-dialog[data-panel=standings]{padding:20px 16px 0;border-radius:20px}#game-dialog[data-panel=standings] h2{font-size:26px}#game-dialog[data-panel=standings] .standings-table thead th{padding:12px 8px;font-size:10px}#game-dialog[data-panel=standings] .standings-table thead th:first-child{width:44px}#game-dialog[data-panel=standings] .standings-table thead th:nth-child(3){width:64px}#game-dialog[data-panel=standings] .standings-table thead th:last-child{width:76px}#game-dialog[data-panel=standings] .standings-table tbody :is(th,td){padding:12px 8px}.standing-player{gap:8px;align-items:flex-start}.standing-avatar{flex-basis:36px;width:36px;height:36px;font-size:18px}.standing-player-text>strong{font-size:12px}.standing-labels>span{font-size:8px;padding:2px 4px}#game-dialog[data-panel=standings] .standing-round,#game-dialog[data-panel=standings] .standing-total{font-size:14px}#game-dialog[data-panel=standings] .standings-footer{margin-left:-16px;margin-right:-16px;padding:16px;border-radius:0 0 18px 18px;gap:12px}}
+@media(max-width:450px){#game-dialog[data-panel=standings]{width:calc(100vw - 24px);max-height:calc(100dvh - 24px);padding:16px 12px 0}.standing-player{flex-direction:column;gap:6px}.standing-avatar{flex:0 0 32px;width:32px;height:32px}.standing-player-text>strong{font-size:11px}#game-dialog[data-panel=standings] .standings-table thead th:first-child{width:36px}#game-dialog[data-panel=standings] .standings-table thead th:nth-child(3){width:58px}#game-dialog[data-panel=standings] .standings-table thead th:last-child{width:64px}#game-dialog[data-panel=standings] .standings-table tbody :is(th,td){padding:12px 6px}#game-dialog[data-panel=standings] .standings-footer{margin-left:-12px;margin-right:-12px;padding:16px 12px;flex-wrap:wrap}.standings-footer .button{font-size:11px}.standings-summary{font-size:10px}.standings-summary strong{letter-spacing:.5px}#game-dialog[data-panel=standings] .standings-explainer{font-size:11px}}
