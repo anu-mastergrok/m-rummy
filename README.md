@@ -107,3 +107,17 @@ Do not enable HTML/page caching or CDN caching for `/api/*`. The included servic
 Open the same hosted HTTPS link in Android Chrome or iPhone/iPad Safari. Touch-select cards and swipe the hand sideways to reach additional groups. Portrait and landscape layouts are supported, including safe-area spacing and form text sized to prevent Safari's input zoom. The footer has **Add to your home screen** instructions. Browser menus and installation wording vary by OS/browser version; no app-store build is necessary.
 
 Sign in with the same account in your browser or home-screen app to restore your profile and seat: mobile installations may use separate cookie storage. After locking your phone, changing networks, or backgrounding the page, return to it to reconnect. Server timers may still expire while you're away. This repository was tested with desktop Chrome and narrow phone/tablet browser frames; physical Android and iOS devices still need a smoke test after hosting.
+
+## Game board tools
+
+The table toolbar opens your cards, current table penalty standings, table details,
+chat and browser display preferences. Opponents' cards are only visible after the
+round ends. Use **How to play → Six-step guided tutorial** or **Learn rummy** at the
+table to learn sequences, sets, scoring and declarations. Reconnecting disables
+server actions until a fresh snapshot arrives; requests are never replayed automatically.
+
+The implementation mapping, evidence limits and deferred engine dependencies are
+tracked in [docs/GAME_BOARD_IMPLEMENTATION.md](docs/GAME_BOARD_IMPLEMENTATION.md).
+Optional browser regression checks use `npm install --no-save --package-lock=false
+playwright@1.56.1`, `npx playwright install chromium`, then `npm run test:ui`.
+Runtime hosting still requires only PHP and the static public files.

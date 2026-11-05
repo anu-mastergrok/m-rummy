@@ -4,13 +4,16 @@
   "private": true,
   "description": "PHP-powered private Indian rummy, compatible with Hostinger Premium",
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node tools/dev.mjs",
     "dev": "node tools/dev.mjs",
-    "test": "php test/run.php && php test/accounts.php && php test/deploy.php && node --test test/http.test.mjs",
-    "check": "node --check public/app.js && php -l server/rules.php && php -l server/game.php && php -l server/accounts.php && php -l server/bootstrap.php && php -l public/api.php && php -l public/router.php && php -l tools/install-release.php && bash -n tools/deploy-hostinger.sh",
+    "test": "node --test test/board-state.test.mjs && php test/run.php && php test/accounts.php && php test/deploy.php && node --test test/http.test.mjs",
+    "check": "node --check public/app.js && node --check public/board-state.js && node --check public/tutorial.js && php -l server/rules.php && php -l server/game.php && php -l server/accounts.php && php -l server/bootstrap.php && php -l public/api.php && php -l public/router.php && php -l tools/install-release.php && bash -n tools/deploy-hostinger.sh",
     "build": "npm run check",
-    "package": "python3 tools/package.py"
+    "package": "python3 tools/package.py",
+    "test:ui": "node --test test/ui.test.mjs"
   }
 }
