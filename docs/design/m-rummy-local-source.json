@@ -1,0 +1,645 @@
+{
+  "source": {
+    "file": "m-rummy.fig",
+    "sha256": "b9c9ddf96bd09f708cf3b58e6042bea04b8cc2ccbaf2dc2e09a83c734d9cc48f",
+    "exportedAt": "2026-11-04T09:38:33.921Z",
+    "nodeCount": 21730,
+    "embeddedImageCount": 83
+  },
+  "waitingFrame": {
+    "id": "11:73650",
+    "name": "Game Board - Match Making ",
+    "size": {
+      "x": 1080,
+      "y": 1920
+    },
+    "transform": {
+      "m00": 6.123234262925839e-17,
+      "m01": 1,
+      "m02": 2529,
+      "m10": -1,
+      "m11": 6.123234262925839e-17,
+      "m12": 1444
+    },
+    "visible": true,
+    "opacity": 1,
+    "fillPaints": [
+      {
+        "type": "SOLID",
+        "color": {
+          "r": 0.09019608050584793,
+          "g": 0.08627451211214066,
+          "b": 0.18039216101169586,
+          "a": 1
+        },
+        "opacity": 1,
+        "visible": true,
+        "blendMode": "NORMAL",
+        "authoredColor": {
+          "space": "DEFAULT",
+          "c0": 0.09019608050584793,
+          "c1": 0.08627451211214066,
+          "c2": 0.18039216101169586,
+          "c3": 1
+        }
+      }
+    ]
+  },
+  "sourceProperties": {
+    "11:73714": {
+      "name": "Ellipse 6022",
+      "size": {
+        "x": 1707.5628662109375,
+        "y": 827.513671875
+      },
+      "transform": {
+        "m00": 6.123234262925839e-17,
+        "m01": -1,
+        "m02": 1203.513671875,
+        "m10": 1,
+        "m11": 6.123234262925839e-17,
+        "m12": 106.14794921875
+      },
+      "visible": true,
+      "opacity": 0.10000000149011612,
+      "fillPaints": [
+        {
+          "type": "GRADIENT_RADIAL",
+          "opacity": 1,
+          "visible": true,
+          "blendMode": "NORMAL",
+          "stops": [
+            {
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1,
+                "a": 1
+              },
+              "position": 0
+            },
+            {
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1,
+                "a": 0
+              },
+              "position": 1
+            }
+          ],
+          "transform": {
+            "m00": 6.123234262925839e-17,
+            "m01": 1,
+            "m02": 0,
+            "m10": -1,
+            "m11": 6.123234262925839e-17,
+            "m12": 1
+          },
+          "stopsVar": [],
+          "interpolationColorSpace": "DEFAULT",
+          "interpolationHueMethod": "INCREASING",
+          "authoredStops": [
+            {
+              "authoredColor": {
+                "space": "DEFAULT",
+                "c0": 1,
+                "c1": 1,
+                "c2": 1,
+                "c3": 1
+              },
+              "position": 0
+            },
+            {
+              "authoredColor": {
+                "space": "DEFAULT",
+                "c0": 1,
+                "c1": 1,
+                "c2": 1,
+                "c3": 0
+              },
+              "position": 1
+            }
+          ]
+        }
+      ]
+    },
+    "11:73715": {
+      "name": "Rectangle 39508",
+      "size": {
+        "x": 629.9708251953125,
+        "y": 27.99827003479004
+      },
+      "transform": {
+        "m00": 6.123234262925839e-17,
+        "m01": -1,
+        "m02": 402.7168273925781,
+        "m10": 1,
+        "m11": 6.123234262925839e-17,
+        "m12": 640.791748046875
+      },
+      "visible": true,
+      "opacity": 1,
+      "fillPaints": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.21176470816135406,
+            "g": 0.3607843220233917,
+            "b": 0.3490196168422699,
+            "a": 1
+          },
+          "opacity": 1,
+          "visible": true,
+          "blendMode": "NORMAL",
+          "authoredColor": {
+            "space": "DEFAULT",
+            "c0": 0.21176470816135406,
+            "c1": 0.3607843220233917,
+            "c2": 0.3490196168422699,
+            "c3": 1
+          }
+        }
+      ]
+    },
+    "11:73716": {
+      "name": "Rectangle 39509",
+      "size": {
+        "x": 493.53875732421875,
+        "y": 20.921907424926758
+      },
+      "transform": {
+        "m00": 6.123234262925839e-17,
+        "m01": -1,
+        "m02": 399.2217102050781,
+        "m10": 1,
+        "m11": 6.123234262925839e-17,
+        "m12": 645.269287109375
+      },
+      "visible": true,
+      "opacity": 1,
+      "fillPaints": [
+        {
+          "type": "GRADIENT_LINEAR",
+          "opacity": 1,
+          "visible": true,
+          "blendMode": "NORMAL",
+          "stops": [
+            {
+              "color": {
+                "r": 0.371428906917572,
+                "g": 1,
+                "b": 0.779280424118042,
+                "a": 1
+              },
+              "position": 0
+            },
+            {
+              "color": {
+                "r": 0.062745101749897,
+                "g": 0.6196078658103943,
+                "b": 0.33725491166114807,
+                "a": 1
+              },
+              "position": 1
+            }
+          ],
+          "transform": {
+            "m00": 6.123234262925839e-17,
+            "m01": 1,
+            "m02": 0,
+            "m10": -1,
+            "m11": 6.123234262925839e-17,
+            "m12": 1
+          },
+          "stopsVar": [],
+          "interpolationColorSpace": "DEFAULT",
+          "interpolationHueMethod": "INCREASING",
+          "authoredStops": [
+            {
+              "authoredColor": {
+                "space": "DEFAULT",
+                "c0": 0.371428906917572,
+                "c1": 1,
+                "c2": 0.779280424118042,
+                "c3": 1
+              },
+              "position": 0
+            },
+            {
+              "authoredColor": {
+                "space": "DEFAULT",
+                "c0": 0.062745101749897,
+                "c1": 0.6196078658103943,
+                "c2": 0.33725491166114807,
+                "c3": 1
+              },
+              "position": 1
+            }
+          ]
+        }
+      ]
+    },
+    "11:73717": {
+      "name": "Players are getting Ready",
+      "size": {
+        "x": 335,
+        "y": 44
+      },
+      "transform": {
+        "m00": 6.123234262925839e-17,
+        "m01": -1,
+        "m02": 473.8711242675781,
+        "m10": 1,
+        "m11": 6.123234262925839e-17,
+        "m12": 792.499755859375
+      },
+      "visible": true,
+      "opacity": 1,
+      "fillPaints": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 1,
+            "g": 1,
+            "b": 1,
+            "a": 1
+          },
+          "opacity": 1,
+          "visible": true,
+          "blendMode": "NORMAL",
+          "authoredColor": {
+            "space": "DEFAULT",
+            "c0": 1,
+            "c1": 1,
+            "c2": 1,
+            "c3": 1
+          }
+        }
+      ],
+      "fontName": {
+        "family": "SF Pro Display",
+        "style": "Regular",
+        "postscript": "SFProDisplay-Regular"
+      },
+      "fontSize": 31.667200088500977
+    },
+    "11:73727": {
+      "name": "02:45",
+      "size": {
+        "x": 82,
+        "y": 44
+      },
+      "transform": {
+        "m00": 6.123234262925839e-17,
+        "m01": -1,
+        "m02": 361.4658508300781,
+        "m10": 1,
+        "m11": 6.123234262925839e-17,
+        "m12": 925.874755859375
+      },
+      "visible": true,
+      "opacity": 1,
+      "fillPaints": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 1,
+            "g": 1,
+            "b": 1,
+            "a": 1
+          },
+          "opacity": 1,
+          "visible": true,
+          "blendMode": "NORMAL",
+          "authoredColor": {
+            "space": "DEFAULT",
+            "c0": 1,
+            "c1": 1,
+            "c2": 1,
+            "c3": 1
+          }
+        }
+      ],
+      "fontName": {
+        "family": "SF Pro Display",
+        "style": "Regular",
+        "postscript": "SFProDisplay-Regular"
+      },
+      "fontSize": 31.667200088500977
+    },
+    "11:73774": {
+      "name": "Rectangle 103",
+      "size": {
+        "x": 1920,
+        "y": 162
+      },
+      "transform": {
+        "m00": 6.123234262925839e-17,
+        "m01": -1,
+        "m02": 162.02197265625,
+        "m10": 1,
+        "m11": 6.123234262925839e-17,
+        "m12": 0
+      },
+      "visible": true,
+      "opacity": 1,
+      "fillPaints": [
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0.09019608050584793,
+            "g": 0.08627451211214066,
+            "b": 0.18039216101169586,
+            "a": 1
+          },
+          "opacity": 1,
+          "visible": true,
+          "blendMode": "NORMAL",
+          "authoredColor": {
+            "space": "DEFAULT",
+            "c0": 0.09019608050584793,
+            "c1": 0.08627451211214066,
+            "c2": 0.18039216101169586,
+            "c3": 1
+          }
+        },
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          },
+          "opacity": 0.20000000298023224,
+          "visible": true,
+          "blendMode": "NORMAL",
+          "authoredColor": {
+            "space": "DEFAULT",
+            "c0": 0,
+            "c1": 0,
+            "c2": 0,
+            "c3": 0.20000000298023224
+          }
+        },
+        {
+          "type": "SOLID",
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 0,
+            "a": 1
+          },
+          "opacity": 0.20000000298023224,
+          "visible": true,
+          "blendMode": "NORMAL",
+          "authoredColor": {
+            "space": "DEFAULT",
+            "c0": 0,
+            "c1": 0,
+            "c2": 0,
+            "c3": 0.20000000298023224
+          }
+        }
+      ]
+    }
+  },
+  "assets": [
+    {
+      "path": "public/assets/figma/waiting-table.png",
+      "node": "11:73651",
+      "imageHash": "0a0380d5f4c80acb0d62ab340b3549831746dd1d",
+      "method": "unchanged embedded image",
+      "sha256": "cb89b64d99c01899bc48453c1a640f67ba495148140eab49d555c9751df49b69"
+    },
+    {
+      "path": "public/assets/figma/avatar-1.png",
+      "node": "11:60928",
+      "imageHash": "370444d649339443d461ea25b0204e811114c0d3",
+      "method": "unchanged embedded image",
+      "sha256": "d7a3f671c10fbcc6145d39449caf6c784bc3af58ceb8bb44be5ec50d5bddc30e"
+    },
+    {
+      "path": "public/assets/figma/avatar-5.png",
+      "node": "11:73763",
+      "imageHash": "e865bf9982b387f6fb0aad1a9bf081d7a77f133b",
+      "method": "unchanged embedded image",
+      "sha256": "29ea2f52bdc7899dc95fa1cee04583d322b71880a2a6136095b6ba02cb2972bf"
+    },
+    {
+      "path": "public/assets/figma/avatar-2.svg",
+      "node": "11:71814",
+      "method": "SVG exported from original vector geometry and paint data",
+      "sha256": "66a83cbdd46ea7db5898df679cd6c375d110ebf955c0f099fe52e86d7917f97b"
+    },
+    {
+      "path": "public/assets/figma/avatar-3.svg",
+      "node": "11:72662",
+      "method": "SVG exported from original vector geometry and paint data",
+      "sha256": "8195e580d8d06631451c229fd94f13ef9efe2c0108789302dd72d4c2cdfd76fe"
+    },
+    {
+      "path": "public/assets/figma/avatar-4.svg",
+      "node": "11:71327",
+      "method": "SVG exported from original vector geometry and paint data",
+      "sha256": "d41d2ae99d53c0535833c9c4872fe881fb180ab0c2861646fa38377ad6d7a71c"
+    },
+    {
+      "path": "public/assets/figma/arrow-left.svg",
+      "node": "11:60901",
+      "method": "SVG exported from original vector geometry and paint data",
+      "sha256": "dbb2e47087584344bed03026428d3512159522655927cf007dcabd4877273b58"
+    },
+    {
+      "path": "public/assets/figma/waiting-loader.svg",
+      "node": "11:73718",
+      "method": "SVG exported from original vector geometry and paint data",
+      "sha256": "f6b79cabca819245d2ed60e6c5d23dde3e1fd145b9869c734ce0647e057136ef"
+    },
+    {
+      "path": "public/assets/figma/avatar-6.png",
+      "node": "11:73763",
+      "method": "same default portrait reused for supported sixth seat",
+      "sha256": "29ea2f52bdc7899dc95fa1cee04583d322b71880a2a6136095b6ba02cb2972bf"
+    }
+  ],
+  "screens": [
+    {
+      "id": "11:65148",
+      "name": "Game board - Modal - Leaderbaord",
+      "size": {
+        "x": 1080,
+        "y": 1920
+      }
+    },
+    {
+      "id": "11:65307",
+      "name": "Game board - Modal - Game Info",
+      "size": {
+        "x": 1080,
+        "y": 1920
+      }
+    },
+    {
+      "id": "11:65466",
+      "name": "Game board - Modal - Declaration Try  Again",
+      "size": {
+        "x": 1080,
+        "y": 1920
+      }
+    },
+    {
+      "id": "11:65625",
+      "name": "Game board - Modal - Bet Possible Declaration",
+      "size": {
+        "x": 1080,
+        "y": 1920
+      }
+    },
+    {
+      "id": "11:73650",
+      "name": "Game Board - Match Making ",
+      "size": {
+        "x": 1080,
+        "y": 1920
+      }
+    },
+    {
+      "id": "11:73776",
+      "name": "Game Board - Match Timer ",
+      "size": {
+        "x": 1080,
+        "y": 1920
+      }
+    },
+    {
+      "id": "11:73864",
+      "name": "Game Board - Cards Deal",
+      "size": {
+        "x": 1080,
+        "y": 1920
+      }
+    },
+    {
+      "id": "11:74043",
+      "name": "Game Board -  Splash Screen",
+      "size": {
+        "x": 1080,
+        "y": 1920
+      }
+    },
+    {
+      "id": "11:74045",
+      "name": "Game Board - Message Notification",
+      "size": {
+        "x": 1080,
+        "y": 1920
+      }
+    },
+    {
+      "id": "11:74211",
+      "name": "Game Board - View Cards Modal",
+      "size": {
+        "x": 1080,
+        "y": 1920
+      }
+    },
+    {
+      "id": "11:75070",
+      "name": "Game Board - Game Declared by Other Player",
+      "size": {
+        "x": 1080,
+        "y": 1920
+      }
+    },
+    {
+      "id": "11:75234",
+      "name": "Game Board - Internet Lost ",
+      "size": {
+        "x": 1080,
+        "y": 1920
+      }
+    },
+    {
+      "id": "11:75402",
+      "name": "Game Board - Different States of User",
+      "size": {
+        "x": 1080,
+        "y": 1920
+      }
+    },
+    {
+      "id": "11:82833",
+      "name": "Game Board - Message modal",
+      "size": {
+        "x": 1080,
+        "y": 1920
+      }
+    },
+    {
+      "id": "11:82996",
+      "name": "Game Board - Message Input",
+      "size": {
+        "x": 1080,
+        "y": 1920
+      }
+    },
+    {
+      "id": "11:83159",
+      "name": "Game Board - Setting Modal ",
+      "size": {
+        "x": 1080,
+        "y": 1920
+      }
+    },
+    {
+      "id": "11:84354",
+      "name": "Game Board - Learn Rummy - Step 1",
+      "size": {
+        "x": 1080,
+        "y": 1920
+      }
+    },
+    {
+      "id": "11:84428",
+      "name": "Game Board - Learn Rummy - Step 2",
+      "size": {
+        "x": 1080,
+        "y": 1920
+      }
+    },
+    {
+      "id": "11:84522",
+      "name": "Game Board - Learn Rummy - Step 3",
+      "size": {
+        "x": 1080,
+        "y": 1920
+      }
+    },
+    {
+      "id": "11:84619",
+      "name": "Game Board - Learn Rummy - Step 4",
+      "size": {
+        "x": 1080,
+        "y": 1920
+      }
+    },
+    {
+      "id": "11:84716",
+      "name": "Game Board - Learn Rummy - Step 5",
+      "size": {
+        "x": 1080,
+        "y": 1920
+      }
+    },
+    {
+      "id": "11:84853",
+      "name": "Game Board - Learn Rummy - Step 6",
+      "size": {
+        "x": 1080,
+        "y": 1920
+      }
+    }
+  ]
+}

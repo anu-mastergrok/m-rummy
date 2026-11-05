@@ -60,7 +60,7 @@ async function fixture(t, viewport = { width: 1920, height: 1080 }, multi = fals
     }
     try {
       const file = path === '/' ? 'index.html' : path.slice(1);
-      const contentType = file.endsWith('.js') ? 'text/javascript' : file.endsWith('.css') ? 'text/css' : 'text/html';
+      const contentType = file.endsWith('.js') ? 'text/javascript' : file.endsWith('.css') ? 'text/css' : file.endsWith('.svg') ? 'image/svg+xml' : file.endsWith('.png') ? 'image/png' : 'text/html';
       return route.fulfill({ body: await readFile(resolve('public', file)), contentType });
     } catch { return route.fulfill({ status: 404 }); }
   });
@@ -334,6 +334,7 @@ assert.equal(await page.locator('#app').getAttribute('aria-busy'),null);
 
 const waitingPlayer = (id, name, extra = {}) => ({ id, name, total: 0, count: 0, turns: 0, presence: 'online', ...extra });
 async function waitingScreenshot(page, name) {
+  await page.locator('.waiting-page img').evaluateAll(images => Promise.all(images.map(image => image.decode())));
   if (!process.env.UI_SCREENSHOT_DIR) return;
   await mkdir(process.env.UI_SCREENSHOT_DIR, { recursive: true });
   await page.screenshot({ path: resolve(process.env.UI_SCREENSHOT_DIR, `${name}.png`), fullPage: true });
@@ -342,6 +343,7 @@ test('waiting host sees six seats, invite flow and guarded bot/deal actions', as
   const f = await fixture(t, { width: 1920, height: 1080 }, false, { status: 'lobby', round: 0, hand: [], players: [waitingPlayer('me', 'Me')] });
   const { page, requests } = f;
   assert.equal(await page.locator('.waiting-seat').count(), 6);
+  assert.equal(await page.getByRole('progressbar', { name: 'Seats filled' }).getAttribute('aria-valuenow'), '1');
   assert.equal(await page.locator('.waiting-seat-open').count(), 5);
   assert.equal(await page.locator('.waiting-seat-self').innerText().then(s => s.includes('Me (you)')), true);
   assert.equal(await page.locator('[data-action="start"]').isDisabled(), true);
@@ -392,6 +394,7 @@ test('full waiting table keeps long names contained across viewports', async t =
   const f = await fixture(t, { width: 1024, height: 768 }, false, { status: 'lobby', round: 0, hand: [], players: [waitingPlayer('me', 'Me'), ...Array.from({ length: 5 }, (_, i) => waitingPlayer(`friend-${i}`, 'AveryLongNameWithoutSpaces', { bot: i === 4 }))] });
   const { page } = f;
   assert.equal(await page.locator('.waiting-seat-open').count(), 0);
+  assert.equal(await page.getByRole('progressbar', { name: 'Seats filled' }).getAttribute('aria-valuenow'), '6');
   assert.equal(await page.locator('[data-action="addBot"]').isDisabled(), true);
   assert.equal(await page.locator('[data-action="start"]').isEnabled(), true);
   for (const viewport of [{ width: 1920, height: 1080 }, { width: 1024, height: 768 }, { width: 768, height: 1024 }, { width: 390, height: 844 }]) {
