@@ -488,6 +488,24 @@
       "node": "11:75336",
       "method": "Original source vector paths, paints and transforms; loader instance derived geometry resolved at 56px",
       "sha256": "9667275d2f294a294d2f593f0987cb67ae87726a3257a8f494f7c8b125951193"
+    },
+    {
+      "path": "public/assets/figma/chat-back.svg",
+      "node": "11:82994",
+      "method": "Original vector paths with instance-derived dimensions/transforms; referenced local fill style and explicit overrides resolved",
+      "sha256": "144367e27fdb3d5fc792a86578e6788d6b66976aeb01b5ed29e9e047e67ee509"
+    },
+    {
+      "path": "public/assets/figma/chat-emoji.svg",
+      "node": "11:82771",
+      "method": "Original vector paths with instance-derived dimensions/transforms; referenced local fill style and explicit overrides resolved",
+      "sha256": "6f5d27e0b28d538170b342e19ddd952c0095b429b9892d63d53bb06ce560d015"
+    },
+    {
+      "path": "public/assets/figma/chat-send.svg",
+      "node": "11:82773",
+      "method": "Original vector paths with instance-derived dimensions/transforms; referenced local fill style and explicit overrides resolved",
+      "sha256": "6b6bb7b15a289f068aeab3f88f2b7025a55c2f93b069614f1288da0aa7f709b1"
     }
   ],
   "screens": [
@@ -710,6 +728,29 @@
       "Retry requests a guarded snapshot, never repeats a game move",
       "Presence remains advisory and uses existing away/offline/unknown states",
       "Invalid declaration feedback stays in the existing accessible native dialog"
+    ]
+  },
+  "chatScreen": {
+    "frames": [
+      "11:82833",
+      "11:82996"
+    ],
+    "components": [
+      "11:82755",
+      "11:82765"
+    ],
+    "backgroundNode": "11:82756",
+    "background": "#0e0d22",
+    "border": "#fdfdfe",
+    "inputBorder": "#f2f5f2",
+    "suggestionFill": "white at 20% opacity (11:82780)",
+    "iconFillStyle": "Secondary Colour/Firefly/3, #bccac0 (11:82827)",
+    "adaptations": [
+      "Existing table message history added above the source-inspired suggestion menu",
+      "Six placeholder replies replaced by editable local suggestions; only explicit Send submits",
+      "Source emoji keyboard image is represented by eight accessible native emoji buttons; platform rendering varies",
+      "Native dialog remains modal, styled as a responsive right-side drawer",
+      "SF Pro Display is not bundled; platform fallback used"
     ]
   }
 }

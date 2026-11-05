@@ -20,7 +20,7 @@ async function fixture(t, viewport = { width: 1920, height: 1080 }, multi = fals
   const rooms = new Map([[room.code, room]]);
   if (multi) rooms.set('BBBBBB123456', { ...structuredClone(room), code: 'BBBBBB123456', deadline: Date.now() + 45000, hand: hand.map(c => ({ ...c, suit: 'S' })), messages: [] });
   const requests = [];
-  let offline = false, hold = false, held, holdPoll = false, pollStarted, releasePoll;
+  let offline = false, hold = false, held, holdPoll = false, pollStarted, releasePoll, rejectChat = false;
   await page.route('http://rummy.test/**', async route => {
     const path = new URL(route.request().url()).pathname;
     if (path.startsWith('/api/')) {
@@ -46,6 +46,7 @@ async function fixture(t, viewport = { width: 1920, height: 1080 }, multi = fals
         if (hold) await new Promise(r => { held = r; });
         const target = rooms.get(input.code);
         if (input.action === 'leave') { rooms.delete(input.code); return route.fulfill({ json: { left: true } }); }
+        if (input.action === 'chat' && rejectChat) { rejectChat = false; return route.fulfill({ status: 400, json: { error: 'Chat is temporarily unavailable.' } }); }
         if (input.action === 'declare') return route.fulfill({ status: 400, json: { error: 'Your hand needs a pure sequence.' } });
         if (input.action === 'addBot') target.players.push({ id: `bot-${target.players.length}`, name: 'Practice bot', bot: true, total: 0, count: 0, turns: 0 });
         if (input.action === 'removeBot') target.players = target.players.filter(p => p.id !== input.playerId);
@@ -66,7 +67,7 @@ async function fixture(t, viewport = { width: 1920, height: 1080 }, multi = fals
   });
   await page.goto('http://rummy.test/');
   await page.locator('#connection').waitFor();
-  return { page, room, rooms, requests, errors, holdNextPoll: () => { holdPoll = true; return new Promise(r => { pollStarted = r; }); }, releasePoll: () => releasePoll?.(), setOffline: value => { offline = value; }, hold: () => { hold = true; }, release: () => { hold = false; held?.(); } };
+  return { page, room, rooms, requests, errors, rejectNextChat: () => { rejectChat = true; }, holdNextPoll: () => { holdPoll = true; return new Promise(r => { pollStarted = r; }); }, releasePoll: () => releasePoll?.(), setOffline: value => { offline = value; }, hold: () => { hold = true; }, release: () => { hold = false; held?.(); } };
 }
 const open = (page, name) => page.getByRole('button', { name, exact: true }).click();
 const close = page => page.getByRole('button', { name: 'Close table panel' }).click();
@@ -79,7 +80,7 @@ test('table panels show private hand, real standings, settings and safe chat', a
   await open(page, 'Settings'); await page.getByLabel('Spread out hand cards').check();
   assert.match(await page.locator('html').getAttribute('class'), /roomy-cards/); await close(page);
   await open(page, 'Chat'); await page.locator('#dialog-chat-input').fill('<img src=x onerror=alert(1)>');
-  await page.locator('#dialog-chat-form button').click();
+  await page.locator('#dialog-chat-send').click();
   await page.locator('#game-dialog .message').waitFor();
   assert.equal(room.messages[0].text, '<img src=x onerror=alert(1)>');
   assert.equal(await page.locator('#game-dialog .message img').count(), 0);
@@ -109,7 +110,7 @@ test('network uncertainty gates commands until an authoritative snapshot returns
   assert.equal(await page.locator('[data-draw="stock"]').isDisabled(), true);
   assert.equal(await page.locator('#connection-banner').isVisible(), true);
   await open(page, 'Chat'); await page.locator('#dialog-chat-input').fill('Keep my draft');
-  assert.equal(await page.locator('#dialog-chat-form button').isDisabled(), true);
+  assert.equal(await page.locator('#dialog-chat-send').isDisabled(), true);
   f.setOffline(false); await page.evaluate(() => window.dispatchEvent(new Event('online')));
   await page.waitForFunction(() => !document.querySelector('[data-draw="stock"]').disabled);
   assert.equal(await page.locator('#dialog-chat-input').inputValue(), 'Keep my draft');
@@ -517,4 +518,97 @@ test('declaration feedback uses source styling and settings remain independent',
   await page.keyboard.press('Escape'); await open(page, 'Settings');
   assert.equal(await page.locator('#game-dialog').evaluate(d => d.classList.contains('declaration-notice')), false);
   await page.keyboard.press('Escape'); assert.deepEqual(errors, []);
+});
+
+for (const [width, height] of [[390, 844], [768, 1024], [1024, 768], [1920, 1080]]) {
+  test(`chat drawer fits ${width}px and composes quick replies and emoji without sending`, async t => {
+    const messages = [
+      { id: 'hello', name: 'Friend', text: 'Good luck, everyone!', time: 1793901600000 },
+      { id: 'long', name: 'FriendWithALongUnbrokenDisplayName', text: '<img src=x onerror=alert(1)> ' + 'LongMessage'.repeat(15), time: 1793901660000 },
+    ];
+    const f = await fixture(t, { width, height }, false, { messages }); const { page } = f;
+    await page.locator('[data-card="card-0"]').click();
+    await open(page, 'Chat');
+    await page.locator('#game-dialog img').evaluateAll(images => Promise.all(images.map(image => image.decode())));
+    assert.equal(await page.locator('.chat-quick-replies button').count(), 6);
+    assert.equal(await page.locator('#dialog-chat-send').isDisabled(), true);
+    assert.equal(await page.locator('#game-dialog .message img').count(), 0);
+    assert.match(await page.locator('#game-dialog .message').last().innerText(), /<img src=x/);
+    assert.equal(await page.locator('#game-dialog').evaluate(el => el.scrollWidth <= el.clientWidth), true);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    const bounds = await page.locator('#game-dialog').boundingBox();
+    assert.ok(bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= width + 1 && bounds.y + bounds.height <= height + 1);
+    for (const [asset, size] of [['chat-back', 36], ['chat-emoji', 40], ['chat-send', 40]]) {
+      const box = await page.locator(`#game-dialog img[src$="${asset}.svg"]`).boundingBox();
+      assert.equal(box.width, size); assert.equal(box.height, size);
+    }
+    if (process.env.UI_SCREENSHOT_DIR) {
+      await mkdir(process.env.UI_SCREENSHOT_DIR, { recursive: true });
+      await page.screenshot({ path: resolve(process.env.UI_SCREENSHOT_DIR, `chat-replies-${width}.png`), fullPage: true });
+    }
+    await page.getByRole('button', { name: 'Well played!', exact: true }).click();
+    assert.equal(await page.locator('#dialog-chat-input').inputValue(), 'Well played!');
+    assert.equal(f.requests.length, 0);
+    await page.locator('#dialog-chat-input').fill('Hello ');
+    await page.getByRole('button', { name: 'Choose emoji' }).click();
+    assert.equal(await page.locator('.chat-emoji-grid button').count(), 8);
+    await page.getByRole('button', { name: 'Insert thumbs up' }).click();
+    assert.equal(await page.locator('#dialog-chat-input').inputValue(), 'Hello 👍');
+    assert.equal(await page.locator('#dialog-chat-count').innerText(), '8/240');
+    assert.equal(f.requests.length, 0);
+    if (process.env.UI_SCREENSHOT_DIR) await page.screenshot({ path: resolve(process.env.UI_SCREENSHOT_DIR, `chat-emoji-${width}.png`), fullPage: true });
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#chat-input').inputValue(), 'Hello 👍');
+    assert.equal(await page.locator('[data-card="card-0"]').getAttribute('aria-pressed'), 'true');
+    await open(page, 'Settings');
+    assert.equal(await page.locator('#game-dialog').getAttribute('data-panel'), 'settings');
+    await page.keyboard.press('Escape'); assert.deepEqual(f.errors, []);
+  });
+}
+
+test('chat insertion respects cursor selection and length limit; incoming messages preserve draft and history position', async t => {
+  const messages = Array.from({ length: 30 }, (_, i) => ({ id: `old-${i}`, name: 'Friend', text: `Earlier message ${i}`, time: 1793901600000 + i * 60000 }));
+  const f = await fixture(t, { width: 390, height: 844 }, false, { messages }); const { page, room } = f;
+  await open(page, 'Chat');
+  assert.equal(await page.locator('#dialog-messages').evaluate(el => el.scrollHeight - el.clientHeight - el.scrollTop < 2), true);
+  await page.locator('#dialog-chat-input').fill('Hello friend');
+  await page.locator('#dialog-chat-input').evaluate(el => el.setSelectionRange(6, 12));
+  await page.getByRole('button', { name: 'Choose emoji' }).click();
+  await page.getByRole('button', { name: 'Insert thumbs up' }).click();
+  assert.equal(await page.locator('#dialog-chat-input').inputValue(), 'Hello 👍');
+  await page.locator('#dialog-chat-input').fill('x'.repeat(240));
+  await page.getByRole('button', { name: 'Insert heart' }).click();
+  assert.equal((await page.locator('#dialog-chat-input').inputValue()).length, 240);
+  assert.match(await page.locator('#toast').innerText(), /240/);
+  await page.locator('#dialog-chat-input').fill('A draft while reading');
+  await page.locator('#dialog-chat-input').evaluate(el => el.setSelectionRange(2, 7));
+  await page.locator('#dialog-messages').evaluate(el => { el.scrollTop = 0; });
+  room.messages.push({ id: 'incoming', name: 'Friend', text: 'Incoming update', time: 1793903500000 }); room.version++;
+  await page.locator('#dialog-messages').getByText('Incoming update', { exact: true }).waitFor({ state: 'attached' });
+  assert.equal(await page.locator('#dialog-chat-input').inputValue(), 'A draft while reading');
+  assert.deepEqual(await page.locator('#dialog-chat-input').evaluate(el => [el.selectionStart, el.selectionEnd]), [2, 7]);
+  assert.equal(await page.locator('#dialog-messages').evaluate(el => el.scrollTop), 0);
+  assert.equal(await page.locator('#chat-emoji-toggle').getAttribute('aria-pressed'), 'true');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'dialog-chat-input');
+  assert.equal(f.requests.length, 0); assert.deepEqual(f.errors, []);
+});
+
+test('rejected and pending chat sends retain drafts and do not send twice', async t => {
+  const f = await fixture(t); const { page, requests, room } = f;
+  await open(page, 'Chat');
+  await page.locator('#dialog-chat-input').fill('Retry this draft');
+  f.rejectNextChat(); await page.locator('#dialog-chat-send').click();
+  await page.locator('#toast.error').waitFor();
+  await page.waitForFunction(() => document.querySelector('#dialog-chat-input').value === 'Retry this draft' && !document.querySelector('#dialog-chat-send').disabled);
+  assert.equal(await page.locator('#dialog-chat-count').innerText(), '16/240');
+  assert.equal(requests.length, 1); assert.equal(room.messages.length, 0);
+  f.hold(); await page.locator('#dialog-chat-send').click();
+  await page.waitForFunction(() => document.querySelector('#dialog-chat-send').disabled);
+  await page.locator('#dialog-chat-send').evaluate(el => { el.click(); el.click(); });
+  assert.equal(requests.length, 2);
+  await page.locator('#dialog-chat-input').fill('Newer draft');
+  f.release(); await page.waitForFunction(() => !document.querySelector('#dialog-chat-send').disabled);
+  assert.equal(await page.locator('#dialog-chat-input').inputValue(), 'Newer draft');
+  assert.equal(room.messages.length, 1); assert.equal(room.messages[0].text, 'Retry this draft');
+  assert.equal(requests.length, 2); assert.deepEqual(f.errors, []);
 });

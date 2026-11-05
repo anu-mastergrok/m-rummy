@@ -226,3 +226,46 @@ body:has(.gameplay-page) #profile-button small{color:#c3c1dc}
 @media(max-width:600px){.room-page .connection-notice{padding:18px 16px;border-radius:16px;gap:16px}.connection-notice-heading{align-items:flex-start;gap:14px}.connection-notice h2{font-size:22px;letter-spacing:0}.connection-notice p{font-size:12px}.connection-notice-footer{flex-wrap:wrap;gap:12px}.connection-notice-footer .button{flex:1;min-width:130px}.connection-progress{font-size:12px;gap:8px}#game-dialog.declaration-notice h2{font-size:24px}}
 @media(prefers-reduced-motion:reduce){.connection-progress img{animation:none}}
 .quiet-motion .connection-progress img{animation:none}
+
+/* Table chat: local source Side Message Menu, 11:82755 / 11:82765. */
+#game-dialog[data-panel=chat]{position:fixed;inset:50% 16px auto auto;transform:translateY(-50%);margin:0;width:min(578px,calc(100vw - 32px));height:min(850px,calc(100dvh - 32px));max-width:none;max-height:calc(100dvh - 32px);padding:24px;border:2px solid #fdfdfe;border-radius:24px;background:#0e0d22;color:#f2f5f2;overflow:hidden;font-family:'SF Pro Display',-apple-system,BlinkMacSystemFont,var(--sans)}
+#game-dialog[data-panel=chat][open]{display:flex;flex-direction:column}
+#game-dialog[data-panel=chat] .dialog-head{margin-bottom:12px;flex-shrink:0}
+#game-dialog[data-panel=chat] .dialog-head .eyebrow{color:#bccac0}
+#game-dialog[data-panel=chat] .dialog-head .icon-button{display:grid;place-items:center;width:48px;height:48px;border:1px solid #ffffff50;border-radius:12px;background:#ffffff14}
+#game-dialog[data-panel=chat] .dialog-head img{display:block}
+#game-dialog[data-panel=chat] h2{font:500 30px/1.2 'SF Pro Display',-apple-system,BlinkMacSystemFont,var(--sans);color:#f2f5f2;letter-spacing:-.5px;margin:0 0 8px;flex-shrink:0}
+#game-dialog[data-panel=chat] #game-panel-content{display:flex;flex-direction:column;gap:16px;flex:1;min-height:0}
+#game-dialog[data-panel=chat] .chat-scope{margin:0;font-size:11px;line-height:1.5;letter-spacing:.6px;color:#bccac0;flex-shrink:0;overflow-wrap:anywhere}
+#game-dialog[data-panel=chat] .messages{flex:1;min-height:100px;height:auto;padding:14px 12px;overflow-y:auto;overscroll-behavior:contain;scrollbar-color:#615d83 transparent;border:1px solid #ffffff26;border-radius:14px;background:#17162e}
+#game-dialog[data-panel=chat] .message{padding:10px 12px;margin:0 0 12px;border-radius:12px;background:#ffffff14}
+#game-dialog[data-panel=chat] .message:last-child{margin-bottom:0}
+#game-dialog[data-panel=chat] .message>span{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:12px;line-height:1.5;color:#bccac0;overflow-wrap:anywhere}
+#game-dialog[data-panel=chat] .message time{font-size:10px;color:#c3c1dc;margin:0;white-space:nowrap}
+#game-dialog[data-panel=chat] .message p{color:#f2f5f2;font-size:14px;line-height:1.7;margin:6px 0 0;overflow-wrap:anywhere}
+#game-dialog[data-panel=chat] .chat-empty{height:100%;min-height:100px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:12px}
+#game-dialog[data-panel=chat] .chat-empty strong{font-size:16px;font-weight:500;line-height:1.5}
+#game-dialog[data-panel=chat] .chat-empty p{font-size:12px;line-height:1.7;color:#bccac0;margin:8px 0 0}
+.chat-suggestions{flex-shrink:0}
+.chat-suggestion-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:28px;margin-bottom:8px}
+#game-dialog[data-panel=chat] .chat-suggestion-heading h3{font:500 13px/1.5 'SF Pro Display',-apple-system,BlinkMacSystemFont,var(--sans);color:#f2f5f2;margin:0}
+.chat-suggestion-heading>span{font-size:10px;line-height:1.5;color:#bccac0}
+#game-dialog[data-panel=chat] .text-button{color:#bccac0;font-size:12px;padding:4px;min-height:32px}
+.chat-quick-replies{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.chat-quick-replies button,.chat-emoji-grid button{border:1px solid #ffffff26;border-radius:12px;background:#ffffff33;color:#f2f5f2;min-height:44px;padding:10px 12px;font-size:12px;line-height:1.5;text-align:left;overflow-wrap:anywhere}
+.chat-quick-replies button:hover,.chat-emoji-grid button:hover{background:#ffffff4d}
+.chat-emoji-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.chat-emoji-grid button{font-family:system-ui,'Apple Color Emoji','Segoe UI Emoji',sans-serif;font-size:26px;line-height:1.2;text-align:center;min-height:48px}
+#game-dialog[data-panel=chat] .chat-form{display:flex;align-items:center;gap:8px;flex-shrink:0;border:2px solid #f2f5f2;border-radius:16px;padding:8px;background:transparent}
+#game-dialog[data-panel=chat] .chat-form input{padding:10px 4px;background:transparent;color:#f2f5f2;font-size:16px;min-height:44px;min-width:0;border:0;width:100%;flex:1}
+#game-dialog[data-panel=chat] .chat-form input::placeholder{color:#b0bfb6}
+#game-dialog[data-panel=chat] .chat-form button{display:grid;place-items:center;flex:0 0 44px;width:44px;height:44px;min-width:44px;border:0;border-radius:10px;background:transparent;padding:2px}
+#game-dialog[data-panel=chat] .chat-form img{display:block;flex-shrink:0}
+#game-dialog[data-panel=chat] .chat-form button:not(:disabled):hover,#game-dialog[data-panel=chat] .chat-emoji-toggle[aria-pressed=true]{background:#ffffff26}
+#game-dialog[data-panel=chat] .chat-form button:disabled{opacity:.4}
+.chat-compose-status{display:flex;align-items:flex-start;gap:12px;justify-content:space-between;flex-shrink:0}
+#game-dialog[data-panel=chat] #dialog-chat-status{font-size:11px;line-height:1.5;margin:0;color:#bccac0}
+#game-dialog[data-panel=chat] #dialog-chat-count{font-size:11px;line-height:1.5;color:#bccac0;white-space:nowrap;font-variant-numeric:tabular-nums}
+#game-dialog[data-panel=chat] :is(button,input,[tabindex]):focus-visible{outline:3px solid #5fffc7;outline-offset:2px}
+@media(max-width:600px){#game-dialog[data-panel=chat]{inset:12px 12px auto auto;transform:none;margin:0;width:calc(100vw - 24px);height:calc(100dvh - 24px);max-height:calc(100dvh - 24px);border-radius:18px;padding:18px 16px}#game-dialog[data-panel=chat] h2{font-size:26px}#game-dialog[data-panel=chat] #game-panel-content{gap:12px}#game-dialog[data-panel=chat] .messages{padding:10px 8px}#game-dialog[data-panel=chat] .message{padding:8px 10px}.chat-quick-replies button{font-size:11px;padding:8px 10px}.chat-suggestion-heading>span{font-size:9px}.chat-compose-status{gap:8px}#game-dialog[data-panel=chat] #dialog-chat-status{font-size:10px}#game-dialog[data-panel=chat] .chat-form{gap:4px;padding:6px}#game-dialog[data-panel=chat] .chat-form input{font-size:16px}}
+@media(max-height:600px){#game-dialog[data-panel=chat]{padding:12px 16px}#game-dialog[data-panel=chat] .dialog-head{margin-bottom:6px}#game-dialog[data-panel=chat] h2{font-size:23px}#game-dialog[data-panel=chat] #game-panel-content{gap:8px}#game-dialog[data-panel=chat] .messages{min-height:70px}.chat-quick-replies{grid-template-columns:repeat(3,minmax(0,1fr))}.chat-quick-replies button{padding:6px;font-size:11px}.chat-suggestion-heading{margin-bottom:4px}.chat-emoji-grid{grid-template-columns:repeat(8,minmax(0,1fr));gap:4px}.chat-emoji-grid button{padding:6px 2px;font-size:22px;min-height:40px}}
