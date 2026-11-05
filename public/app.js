@@ -10,7 +10,9 @@ let tables = [], tableLimit = 3, tableEpoch = 0;
 const tableUi = new Map();
 const presenceClient = [...crypto.getRandomValues(new Uint8Array(16))].map(n => n.toString(16).padStart(2, '0')).join('');
 let presenceSequence = 0;
-let openGamePanel = null, declarationError = '';
+let openGamePanel = null, declarationError = '', chatComposerMode = 'replies';
+const chatReplies = ['Hello everyone!', 'Good luck!', 'Nice hand!', 'Well played!', 'Thanks!', 'One moment, please.'];
+const chatEmojis = [['😀', 'Grinning face'], ['😄', 'Smiling face'], ['😂', 'Laughing with tears'], ['🙂', 'Slight smile'], ['👍', 'Thumbs up'], ['👏', 'Applause'], ['🎉', 'Celebration'], ['❤️', 'Heart']];
 let tutorialIndex = 0;
 let preferences = {};
 try { preferences = JSON.parse(localStorage.getItem('mr-preferences') || '{}') || {}; if (typeof preferences !== 'object' || Array.isArray(preferences)) preferences = {}; } catch { /* Optional preferences. */ }
@@ -291,9 +293,12 @@ function renderTutorial() {
 }
 function showGamePanel(panel) {
   if (!state) return;
-  openGamePanel = panel; document.querySelector('#game-panel-content').innerHTML = ''; renderGamePanel();
+  openGamePanel = panel;
+  if (panel === 'chat') chatComposerMode = 'replies';
+  document.querySelector('#game-panel-content').innerHTML = ''; renderGamePanel();
   const dialog = document.querySelector('#game-dialog');
   if (!dialog.open) dialog.showModal();
+  if (panel === 'chat') { const messages = document.querySelector('#dialog-messages'); messages.scrollTop = messages.scrollHeight; }
 }
 function renderGamePanel() {
   if (!openGamePanel || !state) return;
@@ -302,13 +307,17 @@ function renderGamePanel() {
   if (openGamePanel === 'settings' && content.querySelector('[data-preference]')) return;
   const focused = document.activeElement?.id;
   const cursor = document.activeElement?.selectionStart;
+  const cursorEnd = document.activeElement?.selectionEnd;
   const oldMessages = content.querySelector('.messages');
   const scroll = oldMessages?.scrollTop || 0;
   const nearBottom = !oldMessages || oldMessages.scrollHeight - oldMessages.clientHeight - scroll < 32;
-  document.querySelector('#game-dialog').classList.toggle('declaration-notice', openGamePanel === 'declaration');
+  const dialog = document.querySelector('#game-dialog');
+  dialog.dataset.panel = openGamePanel;
+  dialog.classList.toggle('declaration-notice', openGamePanel === 'declaration');
+  dialog.querySelector('.dialog-head [data-close]').innerHTML = openGamePanel === 'chat' ? '<img src="/assets/figma/chat-back.svg" alt="">' : '×';
   document.querySelector('#game-panel-title').textContent = titles[openGamePanel];
   if (openGamePanel === 'chat') {
-    content.innerHTML = `<div class="messages" aria-label="Table message history">${state.messages.length ? state.messages.map(m => `<div class="message"><span>${esc(m.name)} <time>${new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></span><p>${esc(m.text)}</p></div>`).join('') : '<p>No messages yet. Say hello to your table.</p>'}</div><form class="chat-form" id="dialog-chat-form"><label class="sr-only" for="dialog-chat-input">Message your table</label><input id="dialog-chat-input" maxlength="240" required autocomplete="off" placeholder="Say something…" value="${esc(chatDraft)}"><button type="submit" aria-label="Send message" ${busy || connection !== 'connected' ? 'disabled' : ''}>↑</button></form><p id="dialog-chat-status" role="status">${connection !== 'connected' ? 'Reconnecting. Your draft is kept until you can send.' : busy ? 'Sending your action…' : 'Only players at this table can read these messages.'}</p>`;
+    content.innerHTML = `<p class="chat-scope">ROOM ${esc(state.code)} · ${state.players.length}/6 seated</p><div class="messages" id="dialog-messages" role="region" tabindex="0" aria-label="Table message history">${state.messages.length ? state.messages.map(m => `<article class="message"><span>${esc(m.name)} <time>${new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></span><p>${esc(m.text)}</p></article>`).join('') : '<div class="chat-empty"><strong>Your table, your conversation.</strong><p>Say hello or choose a quick reply below.</p></div>'}</div><div class="chat-suggestions"><div class="chat-suggestion-heading"><h3>${chatComposerMode === 'emojis' ? 'Emoji' : 'Quick replies'}</h3>${chatComposerMode === 'emojis' ? '<button type="button" class="text-button" id="chat-show-replies" data-chat-mode="replies">Quick replies</button>' : '<span>Tap to add to your draft</span>'}</div><div class="${chatComposerMode === 'emojis' ? 'chat-emoji-grid' : 'chat-quick-replies'}">${chatComposerMode === 'emojis' ? chatEmojis.map(([emoji, name], i) => `<button type="button" id="chat-emoji-${i}" data-chat-emoji="${i}" aria-label="Insert ${esc(name.toLowerCase())}">${emoji}</button>`).join('') : chatReplies.map((text, i) => `<button type="button" id="chat-reply-${i}" data-chat-reply="${i}">${esc(text)}</button>`).join('')}</div></div><form class="chat-form" id="dialog-chat-form"><button type="button" class="chat-emoji-toggle" id="chat-emoji-toggle" data-chat-mode="${chatComposerMode === 'emojis' ? 'replies' : 'emojis'}" aria-label="Choose emoji" aria-pressed="${chatComposerMode === 'emojis'}"><img src="/assets/figma/chat-emoji.svg" alt=""></button><label class="sr-only" for="dialog-chat-input">Message your table</label><input id="dialog-chat-input" aria-describedby="dialog-chat-status" maxlength="240" required autocomplete="off" placeholder="Your message" value="${esc(chatDraft)}"><button type="submit" id="dialog-chat-send" aria-label="Send message" ${busy || connection !== 'connected' || !chatDraft.trim() ? 'disabled' : ''}><img src="/assets/figma/chat-send.svg" alt=""></button></form><div class="chat-compose-status"><p id="dialog-chat-status" role="status">${connection !== 'connected' ? 'Reconnecting. Your draft is kept until you can send.' : busy ? 'Sending your action…' : 'Only players at this table can read these messages.'}</p><span id="dialog-chat-count" aria-label="Message length">${chatDraft.length}/240</span></div>`;
     const messages = content.querySelector('.messages');
     messages.scrollTop = nearBottom ? messages.scrollHeight : scroll;
   } else if (openGamePanel === 'hand') {
@@ -326,7 +335,9 @@ function renderGamePanel() {
   }
   if (focused === 'dialog-chat-input') {
     const input = content.querySelector('#dialog-chat-input');
-    input?.focus(); input?.setSelectionRange(cursor, cursor);
+    input?.focus({ preventScroll: true }); input?.setSelectionRange(cursor, cursorEnd ?? cursor);
+  } else if (openGamePanel === 'chat' && focused && (focused.startsWith('chat-') || focused === 'dialog-chat-send' || focused === 'dialog-messages')) {
+    document.getElementById(focused)?.focus({ preventScroll: true });
   }
 }
 function updatePresence() {
@@ -368,8 +379,10 @@ function syncControls(fresh = false) {
   }
   const arrange = document.querySelector('[data-panel-action="arrange"]');
   if (arrange) arrange.disabled = blocked;
-  const dialogSend = document.querySelector('#dialog-chat-form button');
-  if (dialogSend) dialogSend.disabled = blocked;
+  const dialogSend = document.querySelector('#dialog-chat-send');
+  if (dialogSend) dialogSend.disabled = blocked || !chatDraft.trim();
+  const counter = document.querySelector('#dialog-chat-count');
+  if (counter) counter.textContent = `${chatDraft.length}/240`;
   const dialogStatus = document.querySelector('#dialog-chat-status');
   if (dialogStatus) dialogStatus.textContent = connection !== 'connected' ? 'Reconnecting. Your draft is kept until you can send.' : busy ? 'Sending your action…' : 'Only players at this table can read these messages.';
   const status = document.querySelector('#command-status');
@@ -466,6 +479,7 @@ document.addEventListener('input', event => {
   if (['chat-input', 'dialog-chat-input'].includes(event.target.id)) {
     chatDraft = event.target.value;
     for (const input of document.querySelectorAll('#chat-input, #dialog-chat-input')) if (input !== event.target) input.value = chatDraft;
+    syncControls();
   }
 });
 document.querySelector('#game-dialog').addEventListener('close', () => { openGamePanel = null; });
@@ -476,19 +490,45 @@ document.querySelector('#game-dialog').addEventListener('change', event => {
   try { localStorage.setItem('mr-preferences', JSON.stringify(preferences)); } catch { toast('Applied for this visit. Browser storage is unavailable.'); }
 });
 document.querySelector('#game-dialog').addEventListener('click', event => {
+  const target = event.target.closest('button');
+  if (!target || target.disabled) return;
+  if (target.dataset.chatMode) {
+    const input = document.querySelector('#dialog-chat-input');
+    const start = input.selectionStart, end = input.selectionEnd;
+    chatComposerMode = target.dataset.chatMode; renderGamePanel();
+    document.querySelector('#dialog-chat-input').setSelectionRange(start, end);
+    document.querySelector('#chat-emoji-toggle').focus(); return;
+  }
+  if (target.dataset.chatReply !== undefined || target.dataset.chatEmoji !== undefined) {
+    const text = target.dataset.chatReply !== undefined ? chatReplies[Number(target.dataset.chatReply)] : chatEmojis[Number(target.dataset.chatEmoji)]?.[0];
+    if (text) insertChatText(text, target.dataset.chatReply !== undefined);
+    return;
+  }
   if (event.target.closest('[data-panel-action="arrange"]') && !busy && connection === 'connected') { document.querySelector('#game-dialog').close(); action('arrange'); }
 });
 document.querySelector('#game-dialog').addEventListener('submit', async event => {
   if (event.target.id !== 'dialog-chat-form') return;
   event.preventDefault(); await sendChat('dialog-chat-input');
 });
+function insertChatText(text, separate = false) {
+  const input = document.querySelector('#dialog-chat-input');
+  if (!input) return;
+  const start = input.selectionStart, end = input.selectionEnd;
+  const before = input.value.slice(0, start), after = input.value.slice(end);
+  const insertion = `${separate && before && !/\s$/.test(before) ? ' ' : ''}${text}${separate && after && !/^\s/.test(after) ? ' ' : ''}`;
+  if (input.value.length - (end - start) + insertion.length > input.maxLength) {
+    toast('Messages can contain up to 240 characters.', true); input.focus(); return;
+  }
+  input.setRangeText(insertion, start, end, 'end');
+  input.dispatchEvent(new Event('input', { bubbles: true })); input.focus();
+}
 async function sendChat(inputId) {
   if (!chatDraft.trim() || busy || connection !== 'connected') return;
   const text = chatDraft; chatDraft = '';
   const sent = await action('chat', { text });
   if (!sent && !chatDraft) chatDraft = text;
   for (const input of document.querySelectorAll('#chat-input, #dialog-chat-input')) input.value = chatDraft;
-  document.getElementById(inputId)?.focus();
+  syncControls(); document.getElementById(inputId)?.focus();
 }
 app.addEventListener('submit', async event => {
   event.preventDefault();
