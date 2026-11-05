@@ -53,3 +53,8 @@ New browser coverage checks presence transitions at an unchanged game version,
 DOM/focus retention, heartbeat identity/order, visibility changes, reload and
 network loss/recovery. HTTP checks verify status enums, private metadata omission,
 malformed update rejection, unchanged game versions and multi-device aggregation.
+
+
+Release validation also requires the new server presence dependency and both imported
+browser modules in the signed release manifest. A regression removes each dependency
+and verifies that installation is rejected before any existing code is replaced.

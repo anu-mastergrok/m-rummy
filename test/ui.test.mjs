@@ -283,7 +283,8 @@ test('each page sends visibility and ordered heartbeats, with a fresh client aft
   await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); document.dispatchEvent(new Event('visibilitychange')); });
   const foreground = new URL((await foregroundRequest).url());
   assert.ok(Number(foreground.searchParams.get('sequence')) > Number(hidden.searchParams.get('sequence')));
-  const reloadRequest = page.waitForRequest(r => r.url().includes('/api/tables'));
+  // The outgoing document can send a final hidden heartbeat during navigation.
+  const reloadRequest = page.waitForRequest(r => r.url().includes('/api/tables') && new URL(r.url()).searchParams.get('client') !== first.searchParams.get('client'));
   await page.reload(); const reloaded = new URL((await reloadRequest).url());
   assert.notEqual(reloaded.searchParams.get('client'), first.searchParams.get('client')); assert.deepEqual(errors, []);
 });
