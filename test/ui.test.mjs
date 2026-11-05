@@ -767,3 +767,89 @@ test('information follows the selected table and its waiting state', async t => 
   assert.doesNotMatch(await page.locator('#game-panel-content').innerText(), /ABCDEF123456|Password protected/);
   assert.equal(f.requests.length, 0); assert.deepEqual(f.errors, []);
 });
+
+for (const [width, height] of [[390, 844], [768, 1024], [1024, 768], [1920, 1080]]) {
+  test(`standings fit six seats at ${width}px with tied ranks and public totals only`, async t => {
+    const players = [waitingPlayer('me', 'Me', { total: 20, count: 13 }),
+      waitingPlayer('other', 'Alpha', { total: 0, count: 13 }),
+      waitingPlayer('third', 'Beta', { total: 0, count: 13 }),
+      waitingPlayer('fourth', 'VeryLongUnbrokenPlayerDisplayName', { total: 80, count: 13 }),
+      waitingPlayer('fifth', 'Practice bot', { total: 40, bot: true, count: 13 }),
+      waitingPlayer('sixth', '<script>Friend</script>', { total: 25, count: 13 })];
+    const f = await fixture(t, { width, height }, false, { players }); const { page } = f;
+    await open(page, 'Standings');
+    await page.locator('#game-dialog img').evaluateAll(images => Promise.all(images.map(image => image.decode())));
+    const places = await page.locator('[data-standing-player] .standing-place>span').allTextContents();
+    assert.deepEqual(places, ['1', '1', '3', '4', '5', '6']);
+    assert.equal(await page.locator('.standing-place small').count(), 2);
+    assert.match(await page.locator('[data-standing-player="me"]').innerText(), /You/);
+    assert.equal(await page.locator('#game-dialog .card, #game-dialog script').count(), 0);
+    assert.equal(await page.locator('.standing-winner').count(), 0);
+    assert.equal(await page.locator('.standing-round [aria-label="Not settled"]').count(), 6);
+    assert.match(await page.locator('[data-standing-player="sixth"]').innerText(), /<script>Friend<\/script>/);
+    assert.equal(await page.locator('#game-dialog').evaluate(el => el.scrollWidth <= el.clientWidth), true);
+    assert.equal(await page.locator('.standings-table-wrap').evaluate(el => el.scrollWidth <= el.clientWidth), true);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    const icon = await page.locator('#game-dialog img[src$="info-close.svg"]').boundingBox();
+    assert.equal(icon.width, 40); assert.equal(icon.height, 40);
+    if (process.env.UI_SCREENSHOT_DIR) {
+      await mkdir(process.env.UI_SCREENSHOT_DIR, { recursive: true });
+      await page.screenshot({ path: resolve(process.env.UI_SCREENSHOT_DIR, `standings-${width}.png`), fullPage: true });
+    }
+    await page.locator('#standings-back').scrollIntoViewIfNeeded(); await page.locator('#standings-back').click();
+    assert.equal(await page.locator('#game-dialog').evaluate(el => el.open), false);
+    assert.equal(f.requests.length, 0); assert.deepEqual(f.errors, []);
+  });
+}
+
+test('standings distinguish the round winner from cumulative rank and clear revealed cards on a new round', async t => {
+  const hands = Array.from({ length: 2 }, (_, p) => Array.from({ length: 13 }, (_, i) => ({ id: `revealed-${p}-${i}`, suit: p ? 'S' : 'H', rank: i + 1 })));
+  const result = { winner: 'other', winnerName: 'Friend', reason: 'last-player', groups: [], scores: [
+    { id: 'me', name: 'Me', penalty: 20, total: 20, hand: hands[0] },
+    { id: 'other', name: 'Friend', penalty: 0, total: 50, hand: hands[1] },
+  ] };
+  const players = [waitingPlayer('me', 'Me', { total: 20, count: 13 }), waitingPlayer('other', 'Friend', { total: 50, count: 13 })];
+  const f = await fixture(t, { width: 1920, height: 1080 }, false, { players, status: 'finished', deadline: 0, result, hand: hands[0] }); const { page, room } = f;
+  await open(page, 'Standings');
+  assert.equal(await page.locator('[data-standing-player="me"] .standing-place>span').innerText(), '1');
+  assert.equal(await page.locator('[data-standing-player="other"] .standing-place>span').innerText(), '2');
+  assert.equal(await page.locator('[data-standing-player="other"] .standing-round').innerText(), '0');
+  assert.equal(await page.locator('[data-standing-player="other"] .standing-winner').innerText(), 'Round winner');
+  assert.equal(await page.locator('[data-standing-player="me"] .standing-winner').count(), 0);
+  await page.locator('#standings-reveal-toggle').click();
+  assert.equal(await page.locator('.standings-revealed .card').count(), 26);
+  room.messages.push({ id: 'update', name: 'Me', text: 'Round reviewed', time: Date.now() }); room.version++;
+  await page.waitForFunction(() => document.querySelector('#game-dialog .standings-revealed')?.open && document.querySelector('#messages')?.textContent.includes('Round reviewed'));
+  assert.equal(await page.locator('.standings-revealed').evaluate(el => el.open), true);
+  if (process.env.UI_SCREENSHOT_DIR) {
+    await mkdir(process.env.UI_SCREENSHOT_DIR, { recursive: true });
+    await page.screenshot({ path: resolve(process.env.UI_SCREENSHOT_DIR, 'standings-revealed-desktop.png'), fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: resolve(process.env.UI_SCREENSHOT_DIR, 'standings-revealed-mobile.png'), fullPage: true });
+  }
+  room.status = 'playing'; room.result = null; room.round = 2; room.version++; room.deadline = Date.now() + 60000;
+  await page.waitForFunction(() => !document.querySelector('#game-dialog .standings-revealed'));
+  assert.equal(await page.locator('#game-dialog .card').count(), 0);
+  assert.equal(await page.locator('.standing-winner').count(), 0);
+  assert.match(await page.locator('.standings-footer').innerText(), /Round 2 in progress/);
+  assert.equal(f.requests.length, 0); assert.deepEqual(f.errors, []);
+});
+
+test('live standings reorder without losing close focus and stay scoped when switching tables', async t => {
+  const f = await fixture(t, { width: 390, height: 844 }, true); const { page, room, rooms } = f;
+  await open(page, 'Standings'); await page.getByRole('button', { name: 'Close table panel', exact: true }).focus();
+  room.players[0].total = 40; room.players[1].total = 10; room.version++;
+  await page.waitForFunction(() => document.querySelector('[data-standing-player]')?.dataset.standingPlayer === 'other');
+  assert.equal(await page.locator('[data-standing-player="me"] .standing-total').innerText(), '40');
+  assert.equal(await page.evaluate(() => document.activeElement.getAttribute('aria-label')), 'Close table panel');
+  await page.keyboard.press('Escape');
+  const second = rooms.get('BBBBBB123456'); second.players[0].total = 5; second.players[1].total = 60; second.version++;
+  await page.locator('[data-switch-table="BBBBBB123456"]').click(); await open(page, 'Standings');
+  assert.match(await page.locator('.standings-summary').innerText(), /BBBBBB123456/);
+  assert.equal(await page.locator('[data-standing-player="me"] .standing-total').innerText(), '5');
+  assert.doesNotMatch(await page.locator('.standings-summary').innerText(), /ABCDEF123456/);
+  await page.keyboard.press('Escape'); await open(page, 'Settings');
+  assert.equal(await page.locator('#game-dialog').getAttribute('data-panel'), 'settings');
+  assert.equal(await page.locator('.standings-table').count(), 0);
+  assert.equal(f.requests.length, 0); assert.deepEqual(f.errors, []);
+});
