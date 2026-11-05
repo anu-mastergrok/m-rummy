@@ -118,10 +118,36 @@ function turnText() {
   const p = state.players.find(p => p.id === state.turn);
   return state.turn === state.me ? state.phase === 'draw' ? 'Your turn. Pick a card.' : 'Select a discard. Make your move.' : `${p.name} is ${state.phase === 'draw' ? 'drawing' : 'choosing a discard'}…`;
 }
+function connectionNotice() {
+  return `<section id="connection-banner" class="connection-banner connection-notice" role="status" aria-live="polite" aria-atomic="true" hidden><div class="connection-notice-heading"><img src="/assets/figma/connection-lost.svg" alt="" width="86" height="86"><div><h2 id="connection-title">Connection interrupted</h2><p id="connection-detail"></p></div></div><div class="connection-notice-footer"><span class="connection-progress"><img src="/assets/figma/connection-loading.svg" alt="" width="56" height="56"><span id="connection-progress">Connecting…</span></span><button type="button" class="button" id="connection-retry">Reconnect now</button></div></section>`;
+}
+function updateConnectionNotice() {
+  const notice = document.querySelector('#connection-banner');
+  if (!notice) return;
+  const returningFocus = document.activeElement?.id === 'connection-retry';
+  notice.hidden = connection === 'connected';
+  if (notice.hidden) {
+    if (returningFocus) (document.querySelector('#connection') || document.querySelector('[data-switch-table]'))?.focus();
+    return;
+  }
+  notice.dataset.connection = connection;
+  const texts = {
+    'connection-title': connection === 'syncing' ? 'Refreshing your table' : 'Connection interrupted',
+    'connection-detail': state ? 'Reconnecting automatically. Your hand and groups stay here. Server timers keep running; game actions resume after the table is refreshed.' : 'Reconnecting to your tables automatically. Server timers keep running; no game actions will be replayed.',
+    'connection-progress': connection === 'syncing' ? 'Checking the latest state…' : 'Connecting…',
+  };
+  for (const [id, text] of Object.entries(texts)) {
+    const element = document.getElementById(id);
+    if (element.textContent !== text) element.textContent = text;
+  }
+  const retry = document.querySelector('#connection-retry');
+  retry.disabled = busy || polling;
+  retry.textContent = polling ? 'Checking…' : 'Reconnect now';
+}
 function roomChrome() {
-  return `<div class="room-heading"><div><div class="eyebrow">YOUR PRIVATE CLUB <span class="connection" id="connection">● Connected</span></div><h1>The friends’ table<span class="round-badge">${state.round ? `Round ${state.round}` : 'Waiting room'}</span></h1></div><div class="button-row"><button class="button secondary small" data-action="invite">Invite friends <span>↗</span></button><button class="icon-button leave-button" data-action="leave" aria-label="Leave table" title="Leave table">${state.status === 'lobby' ? '<img src="/assets/figma/arrow-left.svg" alt="" width="24" height="24">' : '⇥'}</button></div></div>
+  return `<div class="room-heading"><div><div class="eyebrow">YOUR PRIVATE CLUB <span class="connection" id="connection" tabindex="-1">● Connected</span></div><h1>The friends’ table<span class="round-badge">${state.round ? `Round ${state.round}` : 'Waiting room'}</span></h1></div><div class="button-row"><button class="button secondary small" data-action="invite">Invite friends <span>↗</span></button><button class="icon-button leave-button" data-action="leave" aria-label="Leave table" title="Leave table">${state.status === 'lobby' ? '<img src="/assets/figma/arrow-left.svg" alt="" width="24" height="24">' : '⇥'}</button></div></div>
   <div id="table-switcher"></div><nav class="board-toolbar" aria-label="Table tools"><button class="button secondary small" data-action="tutorial">Learn rummy</button><button class="button secondary small" data-panel="chat">Chat</button><button class="button secondary small" data-panel="hand" ${!state.hand.length ? 'disabled' : ''}>View cards</button><button class="button secondary small" data-panel="standings">Standings</button><button class="button secondary small" data-panel="information">Table info</button><button class="button secondary small" data-panel="settings">Settings</button></nav>
-  <div id="connection-banner" class="connection-banner" role="status" hidden></div><div id="command-status" class="sr-only" role="status"></div>
+  ${connectionNotice()}<div id="command-status" class="sr-only" role="status"></div>
 `;
 }
 // Use each player's stable seat index across waiting and active boards.
@@ -225,7 +251,7 @@ function tablePicker() {
   document.querySelector('#game-dialog').close();
   if (!tables.length) { history.replaceState({}, '', '/'); landing(); return; }
   history.replaceState({}, '', '/'); app.className = 'room-page';
-  app.innerHTML = '<h1>Choose your table</h1><p>Your other rounds keep running. Select a table to return to play.</p><div id="table-switcher"></div><div id="connection-banner" class="connection-banner" role="status" hidden></div>';
+  app.innerHTML = `<h1>Choose your table</h1><p>Your other rounds keep running. Select a table to return to play.</p><div id="table-switcher"></div>${connectionNotice()}`;
   renderTableSwitcher(); syncControls();
 }
 async function switchTable(code) {
@@ -279,6 +305,7 @@ function renderGamePanel() {
   const oldMessages = content.querySelector('.messages');
   const scroll = oldMessages?.scrollTop || 0;
   const nearBottom = !oldMessages || oldMessages.scrollHeight - oldMessages.clientHeight - scroll < 32;
+  document.querySelector('#game-dialog').classList.toggle('declaration-notice', openGamePanel === 'declaration');
   document.querySelector('#game-panel-title').textContent = titles[openGamePanel];
   if (openGamePanel === 'chat') {
     content.innerHTML = `<div class="messages" aria-label="Table message history">${state.messages.length ? state.messages.map(m => `<div class="message"><span>${esc(m.name)} <time>${new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></span><p>${esc(m.text)}</p></div>`).join('') : '<p>No messages yet. Say hello to your table.</p>'}</div><form class="chat-form" id="dialog-chat-form"><label class="sr-only" for="dialog-chat-input">Message your table</label><input id="dialog-chat-input" maxlength="240" required autocomplete="off" placeholder="Say something…" value="${esc(chatDraft)}"><button type="submit" aria-label="Send message" ${busy || connection !== 'connected' ? 'disabled' : ''}>↑</button></form><p id="dialog-chat-status" role="status">${connection !== 'connected' ? 'Reconnecting. Your draft is kept until you can send.' : busy ? 'Sending your action…' : 'Only players at this table can read these messages.'}</p>`;
@@ -313,13 +340,14 @@ function updatePresence() {
     if (badge.textContent !== label) badge.textContent = label;
     badge.dataset.presence = status;
     badge.setAttribute('aria-label', `${player.name}: ${label}`);
+    const seat = badge.closest('[data-player-seat]');
+    if (seat) seat.dataset.playerPresence = status;
   }
 }
 function syncControls(fresh = false) {
+  updateConnectionNotice();
   for (const button of document.querySelectorAll('[data-switch-table], [data-add-table], #table-entry-form button[type="submit"]')) button.disabled = busy || connection !== 'connected' || (button.hasAttribute('data-add-table') && tables.length >= tableLimit);
   if (!state) {
-    const banner = document.querySelector('#connection-banner');
-    if (banner) { banner.hidden = connection === 'connected'; banner.textContent = 'Reconnecting to your tables…'; }
     return;
   }
   const blocked = busy || connection !== 'connected';
@@ -337,11 +365,6 @@ function syncControls(fresh = false) {
   if (indicator) {
     indicator.textContent = connection === 'connected' ? '● Connected' : connection === 'syncing' ? '● Syncing' : '● Reconnecting';
     indicator.classList.toggle('offline', connection !== 'connected');
-  }
-  const banner = document.querySelector('#connection-banner');
-  if (banner) {
-    banner.hidden = connection === 'connected';
-    banner.textContent = connection === 'syncing' ? 'Refreshing your hand and turn from the server…' : 'Connection interrupted. Reconnecting automatically. Game actions resume after your table is refreshed.';
   }
   const arrange = document.querySelector('[data-panel-action="arrange"]');
   if (arrange) arrange.disabled = blocked;
@@ -395,10 +418,11 @@ async function poll() {
     if (busy || epoch !== tableEpoch || code !== state?.code) return;
     if (++failures === 2) toast('Connection interrupted. Reconnecting automatically…', true);
     setConnection('reconnecting');
-  } finally { polling = false; }
+  } finally { polling = false; syncControls(); }
 }
 app.addEventListener('click', async event => {
   const target = event.target.closest('button'); if (!target || target.disabled) return;
+  if (target.id === 'connection-retry') { if (!busy && !polling && connection !== 'connected') poll(); return; }
   if (target.dataset.panel) { showGamePanel(target.dataset.panel); return; }
   if (target.dataset.authMode) { if (authBusy) return; authMode = target.dataset.authMode; renderAuth(); return; }
   if (target.dataset.mode) { mode = target.dataset.mode; landing(); return; }

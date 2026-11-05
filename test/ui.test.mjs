@@ -450,3 +450,71 @@ for (const [width, height] of [[390, 844], [768, 1024], [1024, 768], [1920, 1080
     assert.deepEqual(errors, []);
   });
 }
+
+for (const [width, height] of [[390, 844], [1920, 1080]]) {
+  test(`connection notice preserves the hand and retries one snapshot at ${width}px`, async t => {
+    const f = await fixture(t, { width, height }); const { page, room } = f;
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.locator('[data-card="card-0"]').click();
+    await page.locator('#chat-input').fill('Unsent message');
+    f.setOffline(true); await page.evaluate(() => window.dispatchEvent(new Event('offline')));
+    await page.locator('#connection-banner').waitFor();
+    await page.waitForFunction(() => !document.querySelector('#connection-retry').disabled);
+    await page.locator('#connection-banner img').evaluateAll(images => Promise.all(images.map(image => image.decode())));
+    assert.match(await page.locator('#connection-detail').innerText(), /Server timers keep running/);
+    assert.equal(await page.locator('[data-draw="stock"]').isDisabled(), true);
+    assert.equal(await page.locator('[data-card="card-0"]').getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.locator('#chat-input').inputValue(), 'Unsent message');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    for (const [name, size] of [['connection-lost', 86], ['connection-loading', 56]]) {
+      const dimensions = await page.locator(`#connection-banner img[src$="${name}.svg"]`).evaluate(el => ({ width: el.offsetWidth, height: el.offsetHeight }));
+      assert.equal(dimensions.width, size); assert.equal(dimensions.height, size);
+    }
+    if (process.env.UI_SCREENSHOT_DIR) {
+      await mkdir(process.env.UI_SCREENSHOT_DIR, { recursive: true });
+      await page.screenshot({ path: resolve(process.env.UI_SCREENSHOT_DIR, `connection-lost-${width}.png`), fullPage: true });
+    }
+    assert.equal(await page.locator('.connection-progress img').evaluate(el => getComputedStyle(el).animationName), 'none');
+    const started = f.holdNextPoll(); f.setOffline(false);
+    await page.evaluate(() => { const retry = document.querySelector('#connection-retry'); retry.focus(); retry.click(); retry.click(); retry.click(); });
+    await started;
+    assert.equal(await page.locator('#connection-retry').isDisabled(), true);
+    assert.match(await page.locator('#connection-title').innerText(), /Refreshing/);
+    assert.equal(await page.locator('[data-draw="stock"]').isDisabled(), true);
+    f.releasePoll();
+    await page.waitForFunction(() => document.querySelector('#connection-banner').hidden);
+    assert.equal(await page.locator('[data-draw="stock"]').isDisabled(), false);
+    assert.equal(await page.locator('[data-card="card-0"]').getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.locator('#chat-input').inputValue(), 'Unsent message');
+    assert.equal(f.requests.length, 0);
+    // Presence-only snapshots restyle the existing seat without replacing cards or chat input.
+    const input = await page.locator('#chat-input').elementHandle();
+    room.players[1].presence = 'away';
+    await page.locator('[data-player-seat="other"][data-player-presence="away"]').waitFor();
+    assert.equal(await input.evaluate(el => el === document.querySelector('#chat-input')), true);
+    if (process.env.UI_SCREENSHOT_DIR) await page.screenshot({ path: resolve(process.env.UI_SCREENSHOT_DIR, `player-away-${width}.png`), fullPage: true });
+    room.players[1].presence = 'offline';
+    await page.locator('[data-player-seat="other"][data-player-presence="offline"]').waitFor();
+    assert.equal(await page.locator('[data-presence-player="other"]').innerText(), 'Not responding');
+    assert.deepEqual(f.errors, []);
+  });
+}
+
+test('declaration feedback uses source styling and settings remain independent', async t => {
+  const { page, room, errors } = await fixture(t, { width: 390, height: 844 });
+  await page.locator('[data-draw="stock"]').click();
+  await page.locator('[data-card="drawn"]').click();
+  await page.locator('[data-action="declare"]').click();
+  await page.locator('#confirm-yes').click();
+  await page.locator('#game-dialog.declaration-notice').waitFor();
+  assert.match(await page.locator('.declaration-feedback').innerText(), /pure sequence/);
+  assert.equal(room.hand.length, 14);
+  assert.equal(await page.locator('#game-dialog').evaluate(d => d.scrollWidth <= d.clientWidth), true);
+  if (process.env.UI_SCREENSHOT_DIR) {
+    await mkdir(process.env.UI_SCREENSHOT_DIR, { recursive: true });
+    await page.screenshot({ path: resolve(process.env.UI_SCREENSHOT_DIR, 'declaration-feedback-mobile.png'), fullPage: true });
+  }
+  await page.keyboard.press('Escape'); await open(page, 'Settings');
+  assert.equal(await page.locator('#game-dialog').evaluate(d => d.classList.contains('declaration-notice')), false);
+  await page.keyboard.press('Escape'); assert.deepEqual(errors, []);
+});

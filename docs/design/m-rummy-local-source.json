@@ -476,6 +476,18 @@
       "instance": "11:60915",
       "method": "Original vector geometry with instance-derived dimensions/transforms; declare explicit white paint override resolved",
       "sha256": "d5071e0a2335835a166e8542e8ae3b63e79d0dcd7bf146a57594be8ff895bca5"
+    },
+    {
+      "path": "public/assets/figma/connection-lost.svg",
+      "node": "11:75332",
+      "method": "Original source vector paths, paints and transforms; loader instance derived geometry resolved at 56px",
+      "sha256": "438be0e2dbe7b3eb99db5865a41746fef02a81ffd4361454bf953f5a9d448e19"
+    },
+    {
+      "path": "public/assets/figma/connection-loading.svg",
+      "node": "11:75336",
+      "method": "Original source vector paths, paints and transforms; loader instance derived geometry resolved at 56px",
+      "sha256": "9667275d2f294a294d2f593f0987cb67ae87726a3257a8f494f7c8b125951193"
     }
   ],
   "screens": [
@@ -678,6 +690,26 @@
       "Source SF Pro Display unavailable; system fallback",
       "Immediate server deal; no synthetic countdown",
       "Offline renderer mishandles rotated nested cards; raw node and resolved icon geometry used, no pixel-perfect claim"
+    ]
+  },
+  "connectionAndUserStates": {
+    "frames": [
+      "11:75234",
+      "11:75402"
+    ],
+    "notice": "11:75328",
+    "awayBubble": "11:75566",
+    "invalidDeclarationBubble": "11:75562",
+    "surface": "#f2f5f2",
+    "alert": "#d64326",
+    "statusText": "#00236a",
+    "userStateText": "#00272f",
+    "adaptations": [
+      "Notice is in document flow rather than covering the hand",
+      "Connection interrupted avoids claiming that every server/request failure is internet loss",
+      "Retry requests a guarded snapshot, never repeats a game move",
+      "Presence remains advisory and uses existing away/offline/unknown states",
+      "Invalid declaration feedback stays in the existing accessible native dialog"
     ]
   }
 }
