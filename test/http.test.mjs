@@ -29,6 +29,10 @@ test('HTTP multiplayer, isolation, CSRF, competing moves, reconnect, and durable
   async function stop() { if (processPHP.exitCode === null) { processPHP.kill(); await new Promise(r => processPHP.once('exit', r)); } }
   t.after(async () => { await stop(); await rm(data, { recursive: true, force: true }); });
   await start();
+  for (const file of ['app.js', 'board-state.js', 'tutorial.js']) {
+    const module = await fetch(`${base}/${file}`); assert.equal(module.status, 200, `${file} must be served by the PHP router`);
+    assert.match(module.headers.get('content-type'), /javascript/);
+  }
   async function user() {
     const response = await fetch(`${base}/api/session`); const cookie = response.headers.get('set-cookie').split(';')[0];
     assert.match(response.headers.get('set-cookie'), /HttpOnly/i); assert.match(response.headers.get('set-cookie'), /SameSite=Strict/i);
@@ -61,6 +65,10 @@ test('HTTP multiplayer, isolation, CSRF, competing moves, reconnect, and durable
   assert.equal((await request(outsider, 'profile')).status, 401);
   const created = await request(a, 'create', { name: 'Sunil', password: 'friends' }); assert.equal(created.status, 200);
   const code = created.body.code;
+  const joinedTables = await request(a, `tables?code=${code}`);
+  assert.equal(joinedTables.status, 200); assert.equal(joinedTables.body.active.code, code);
+  assert.equal(joinedTables.body.tables[0].code, code); assert.equal(joinedTables.body.tableLimit, 3);
+  assert.deepEqual((await request(outsider, `tables?code=${code}`)).body.tables, []);
   assert.equal((await request(b, 'join', { code, name: 'Friend', password: 'wrong' })).status, 400);
   const joined = await request(b, 'join', { code, name: 'Friend', password: 'friends' }); assert.equal(joined.status, 200);
   const blocked = await request(outsider, `room?code=${code}`); assert.equal(blocked.status, 400); assert.equal(blocked.body.hand, undefined);

@@ -10,15 +10,38 @@ function rummy_limit(array &$store, string $key, int $max, int $period = 60000):
     if (!isset($store['limits'][$key]) || $store['limits'][$key]['until'] < $now) $store['limits'][$key] = ['count' => 0, 'until' => $now + $period];
     if (++$store['limits'][$key]['count'] > $max) throw new RummyApiError('Too many requests. Please wait a minute.', 429);
 }
+// Bounded concurrency keeps the shared-file polling architecture predictable.
+const RUMMY_TABLE_LIMIT = 3;
+function rummy_joined_codes(array $store, string $id): array {
+    $codes = [];
+    foreach ($store['rooms'] as $code => $room) if (rummy_find($room, $id) !== null) $codes[] = (string)$code;
+    return $codes;
+}
 function rummy_current(array $store, string $id): ?string {
-    foreach ($store['rooms'] as $code => $room) if (rummy_find($room, $id) !== null) return (string)$code;
-    return null;
+    return rummy_joined_codes($store, $id)[0] ?? null;
+}
+function rummy_tables_view(array &$store, string $id, string $selected = ''): array {
+    $tables = []; $active = null;
+    foreach (rummy_joined_codes($store, $id) as $code) {
+        $room = &$store['rooms'][$code];
+        // Resolve deadlines for inactive tables too, under the same storage lock.
+        rummy_tick($room); rummy_settle($store, $room);
+        $me = $room['players'][rummy_find($room, $id)];
+        $tables[] = ['code' => $code, 'version' => $room['version'], 'round' => $room['round'],
+            'status' => $room['status'], 'phase' => $room['phase'], 'deadline' => $room['deadline'],
+            'yourTurn' => $room['status'] === 'playing' && !$me['dropped'] && $room['players'][$room['turn']]['id'] === $id,
+            'dropped' => $me['dropped'], 'playerCount' => count($room['players'])];
+        if ($code === $selected) $active = rummy_room_view($store, $room, $id);
+        unset($room);
+    }
+    return ['tables' => $tables, 'active' => $active, 'tableLimit' => RUMMY_TABLE_LIMIT, 'serverTime' => rummy_now()];
 }
 function rummy_session_cookie(string $token, array $session, array $config): void {
     setcookie('mr_session', $token, ['expires' => (int)($session['expires'] / 1000), 'path' => '/', 'secure' => $config['secure_cookies'], 'httponly' => true, 'samesite' => 'Strict']);
 }
 function rummy_session_view(array $store, array $session): array {
     return ['id' => $session['id'], 'csrf' => $session['csrf'], 'room' => rummy_current($store, $session['id']),
+        'rooms' => rummy_joined_codes($store, $session['id']), 'tableLimit' => RUMMY_TABLE_LIMIT,
         'account' => !empty($session['accountId']) ? rummy_profile($store, $session['id']) : null];
 }
 function rummy_rotate_session(array &$store, string $oldToken, string $id, bool $signedIn, array $config): array {
@@ -83,11 +106,16 @@ function rummy_handle(array &$store, array $config, string $route, string $metho
         rummy_require($offset !== false && $offset >= 0 && $offset <= 1000000, 'Invalid history page.');
         return rummy_profile($store, $id, $offset);
     }
+    if ($route === 'tables' && $method === 'GET') {
+        $selected = $_GET['code'] ?? '';
+        rummy_require(is_string($selected) && ($selected === '' || preg_match('/^[A-Fa-f0-9]{12}$/D', $selected)), 'Invalid selected table.');
+        return rummy_tables_view($store, $id, strtoupper($selected));
+    }
     if (in_array($route, ['create', 'join'], true) && empty($session['accountId'])) throw new RummyApiError('Create an account or sign in to play.', 401);
     if ($route === 'create' && $method === 'POST') {
         $key = $config['create_room_key'];
         if ($key !== '' && (!is_string($input['accessKey'] ?? null) || !hash_equals($key, $input['accessKey']))) throw new RummyApiError('Enter the host access code to create a table.', 403);
-        rummy_require(rummy_current($store, $id) === null, 'You already have a table. Return to it or leave it first.');
+        rummy_require(count(rummy_joined_codes($store, $id)) < RUMMY_TABLE_LIMIT, 'You can join up to 3 tables. Leave a table between rounds before adding another.');
         rummy_require(count($store['rooms']) < $config['max_rooms'], 'Server is full. Please try later.');
         $room = rummy_create($id, $store['users'][$id]['name'], $input['password'] ?? '');
         rummy_log($room, $room['players'][0]['name'] . ' opened the table.');
@@ -100,8 +128,7 @@ function rummy_handle(array &$store, array $config, string $route, string $metho
     $room = &$store['rooms'][$code];
     if ($route === 'join' && $method === 'POST') {
         rummy_limit($store, "join:$id", 10);
-        $current = rummy_current($store, $id);
-        rummy_require($current === null || $current === $code, 'Leave your current table before joining another.');
+        rummy_require(rummy_find($room, $id) !== null || count(rummy_joined_codes($store, $id)) < RUMMY_TABLE_LIMIT, 'You can join up to 3 tables. Leave a table between rounds before adding another.');
         rummy_join($room, $id, $store['users'][$id]['name'], $input['password'] ?? '');
         return rummy_room_view($store, $room, $id);
     }
@@ -161,7 +188,7 @@ function rummy_api(): void {
     try {
         $method = $_SERVER['REQUEST_METHOD']; $route = $_GET['route'] ?? '';
         if (!in_array($method, ['GET', 'POST'], true)) throw new RummyApiError('Method not allowed.', 405);
-        if (!is_string($route) || !in_array($route, ['session', 'room', 'create', 'join', 'action', 'register', 'login', 'logout', 'profile'], true)) throw new RummyApiError('Not found.', 404);
+        if (!is_string($route) || !in_array($route, ['session', 'room', 'tables', 'create', 'join', 'action', 'register', 'login', 'logout', 'profile'], true)) throw new RummyApiError('Not found.', 404);
         if (!is_int($config['win_points_per_opponent']) || $config['win_points_per_opponent'] < 1 || $config['win_points_per_opponent'] > 10000) throw new LogicException('Invalid win points configuration.');
         $input = [];
         if ($method === 'POST') {

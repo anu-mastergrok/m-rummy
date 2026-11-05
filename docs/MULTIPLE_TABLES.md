@@ -1,0 +1,28 @@
+# Multiple tables implementation
+
+Extends the functional scope of Game Board section 11:78780 using the existing
+private, free-play engine. This is not a claim of exact Figma visual fidelity.
+
+## Contract
+
+- An account may occupy at most three tables, including waiting/finished tables.
+  The limit is enforced under the existing exclusive storage lock.
+- Existing `/api/room` and command contracts remain compatible. Session responses
+  add `rooms` and `tableLimit`; the original `room` field remains a fallback.
+- `GET /api/tables?code=CODE` advances all of the caller's joined tables and returns
+  public per-table metadata plus an authorized private snapshot for the selected
+  table only. Unknown/unjoined selected tables return `active: null`; other players'
+  membership, hands, passwords and session data are never included in summaries.
+- Each table keeps its existing independent version, hand, round, deadline, chat and
+  reward settlement. Polling never replays a command or changes the selected table.
+- A table's deadline continues while inactive. As before, server timeouts advance
+  on a connected player's request, not a background PHP process.
+- Leaving remains allowed only between rounds. A dropped player still occupies
+  their seat until that round ends. No financial behavior or rule changes.
+
+## Milestones
+
+1. API membership/cap, aggregate authorized polling, privacy/isolation/timeout tests,
+   Apache route and local module-serving fix.
+2. Client table switcher, add/create/join flow, table-local UI state and recovery.
+3. Browser/integration regression, responsive/keyboard verification and release checks.
