@@ -197,3 +197,32 @@ body:has(.gameplay-page) .free-pill{color:#c3c1dc}
 
 body:has(.gameplay-page) #profile-button{background:#27245d;border-color:#8179ba;color:#fff}
 body:has(.gameplay-page) #profile-button small{color:#c3c1dc}
+
+/* Connection and player feedback: local source frames 11:75234 / 11:75402. */
+.room-page .connection-notice{width:100%;max-width:734px;margin:8px auto 24px;padding:24px 28px;border:1px solid #c9d5cd;border-radius:20px;background:#f2f5f2;color:#00236a;box-shadow:0 12px 32px #0003;display:grid;gap:18px;font-family:'SF Pro Display',-apple-system,BlinkMacSystemFont,var(--sans)}
+.room-page .connection-notice[hidden]{display:none}
+.connection-notice-heading{display:flex;align-items:center;gap:22px;min-width:0}
+.connection-notice-heading>img{display:block;flex-shrink:0}
+.connection-notice-heading>div{min-width:0}
+.connection-notice h2{font:600 clamp(22px,2.1vw,32px)/1.25 'SF Pro Display',-apple-system,BlinkMacSystemFont,var(--sans);color:#d64326;letter-spacing:-.4px;margin:0 0 10px;overflow-wrap:anywhere}
+.connection-notice[data-connection=syncing] h2{color:#00236a}
+.connection-notice p{font-size:13px;line-height:1.7;color:#34505b;margin:0}
+.connection-notice-footer{display:flex;align-items:center;justify-content:space-between;gap:18px;border-top:1px solid #c9d5cd;padding-top:14px}
+.connection-progress{display:flex;align-items:center;gap:12px;min-width:0;font-size:14px;line-height:1.5;color:#00236a}
+.connection-progress img{display:block;flex-shrink:0;animation:waiting-spin 1.4s linear infinite}
+.connection-notice-footer .button{min-height:44px;background:#27245d;color:#fff;border-color:#4b467d;flex-shrink:0;font-size:12px}
+.connection-notice-footer .button:disabled{opacity:1;background:#dedee7;color:#4c4a65;border-color:#b4b2c7}
+.connection-notice-footer .button:focus-visible{outline-color:#00236a;outline-width:3px}
+.room-page [data-player-seat][data-player-presence=away] .player-presence{background:#f2f5f2;color:#00272f;border-color:#f2f5f2;font-weight:600}
+.room-page [data-player-seat][data-player-presence=offline] .player-presence{background:#fce6d3;color:#8d2816;border-color:#fce6d3;font-weight:600}
+.room-page [data-player-seat][data-player-presence=unknown] .player-presence{background:#e4e3ef;color:#39365b;border-color:#e4e3ef}
+#game-dialog.declaration-notice{background:#f2f5f2;color:#00272f;border-color:#c9d5cd;font-family:'SF Pro Display',-apple-system,BlinkMacSystemFont,var(--sans)}
+#game-dialog.declaration-notice h2{font:600 27px/1.3 'SF Pro Display',-apple-system,BlinkMacSystemFont,var(--sans);color:#00272f;letter-spacing:-.4px}
+#game-dialog.declaration-notice p{color:#34505b}
+#game-dialog.declaration-notice .declaration-feedback{background:#fff;border:1px solid #c9d5cd;border-left:4px solid #d64326;border-radius:10px;padding:16px;font-size:14px;color:#00272f}
+#game-dialog.declaration-notice .primary{background:#27245d;color:#fff}
+#game-dialog.declaration-notice .secondary{background:#fff;color:#00272f;border-color:#aabfb4}
+#game-dialog.declaration-notice :is(button,a):focus-visible{outline-color:#00236a}
+@media(max-width:600px){.room-page .connection-notice{padding:18px 16px;border-radius:16px;gap:16px}.connection-notice-heading{align-items:flex-start;gap:14px}.connection-notice h2{font-size:22px;letter-spacing:0}.connection-notice p{font-size:12px}.connection-notice-footer{flex-wrap:wrap;gap:12px}.connection-notice-footer .button{flex:1;min-width:130px}.connection-progress{font-size:12px;gap:8px}#game-dialog.declaration-notice h2{font-size:24px}}
+@media(prefers-reduced-motion:reduce){.connection-progress img{animation:none}}
+.quiet-motion .connection-progress img{animation:none}
