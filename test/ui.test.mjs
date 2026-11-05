@@ -3,11 +3,11 @@
 //      npm run test:ui
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
-async function fixture(t, viewport = { width: 1920, height: 1080 }, multi = false) {
+async function fixture(t, viewport = { width: 1920, height: 1080 }, multi = false, initial = {}) {
   const browser = await chromium.launch({ ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}) });
   t.after(() => browser.close());
   const page = await browser.newPage({ viewport });
@@ -16,6 +16,7 @@ async function fixture(t, viewport = { width: 1920, height: 1080 }, multi = fals
   const room = { code: 'ABCDEF123456', version: 1, round: 1, status: 'playing', phase: 'draw', me: 'me', host: 'me', turn: 'me', deadline: Date.now() + 60000, hand,
     players: [{ id: 'me', name: 'Me', total: 0, turns: 0, count: 13 }, { id: 'other', name: 'Friend', total: 10, count: 13 }],
     indicator: { id: 'wild', rank: 5, suit: 'C' }, wildRank: 5, stockCount: 70, topDiscard: { id: 'discard', rank: 6, suit: 'S' }, messages: [], activity: [], history: [], account: { name: 'Me', points: 10000 } };
+  Object.assign(room, initial);
   const rooms = new Map([[room.code, room]]);
   if (multi) rooms.set('BBBBBB123456', { ...structuredClone(room), code: 'BBBBBB123456', deadline: Date.now() + 45000, hand: hand.map(c => ({ ...c, suit: 'S' })), messages: [] });
   const requests = [];
@@ -46,6 +47,9 @@ async function fixture(t, viewport = { width: 1920, height: 1080 }, multi = fals
         const target = rooms.get(input.code);
         if (input.action === 'leave') { rooms.delete(input.code); return route.fulfill({ json: { left: true } }); }
         if (input.action === 'declare') return route.fulfill({ status: 400, json: { error: 'Your hand needs a pure sequence.' } });
+        if (input.action === 'addBot') target.players.push({ id: `bot-${target.players.length}`, name: 'Practice bot', bot: true, total: 0, count: 0, turns: 0 });
+        if (input.action === 'removeBot') target.players = target.players.filter(p => p.id !== input.playerId);
+        if (input.action === 'start') { target.status = 'playing'; target.round = 1; target.hand = hand; }
         if (input.action === 'draw') { target.phase = 'discard'; target.hand = [...target.hand, { id: 'drawn', rank: 2, suit: 'S' }]; }
         if (input.action === 'discard') { target.hand = target.hand.filter(c => c.id !== input.cardId); target.turn = 'other'; target.phase = 'draw'; target.deadline = Date.now() + 60000; }
         if (input.action === 'chat') target.messages.push({ id: `m${requests.length}`, name: 'Me', text: input.text, time: Date.now() });
@@ -61,7 +65,7 @@ async function fixture(t, viewport = { width: 1920, height: 1080 }, multi = fals
     } catch { return route.fulfill({ status: 404 }); }
   });
   await page.goto('http://rummy.test/');
-  await page.getByRole('button', { name: 'View cards', exact: true }).waitFor();
+  await page.locator('#connection').waitFor();
   return { page, room, rooms, requests, errors, holdNextPoll: () => { holdPoll = true; return new Promise(r => { pollStarted = r; }); }, releasePoll: () => releasePoll?.(), setOffline: value => { offline = value; }, hold: () => { hold = true; }, release: () => { hold = false; held?.(); } };
 }
 const open = (page, name) => page.getByRole('button', { name, exact: true }).click();
@@ -326,4 +330,76 @@ assert.equal(await page.locator('body').getAttribute('class'),'');
 assert.equal(await page.locator('#app').getAttribute('aria-busy'),null);
 
 
+});
+
+const waitingPlayer = (id, name, extra = {}) => ({ id, name, total: 0, count: 0, turns: 0, presence: 'online', ...extra });
+async function waitingScreenshot(page, name) {
+  if (!process.env.UI_SCREENSHOT_DIR) return;
+  await mkdir(process.env.UI_SCREENSHOT_DIR, { recursive: true });
+  await page.screenshot({ path: resolve(process.env.UI_SCREENSHOT_DIR, `${name}.png`), fullPage: true });
+}
+test('waiting host sees six seats, invite flow and guarded bot/deal actions', async t => {
+  const f = await fixture(t, { width: 1920, height: 1080 }, false, { status: 'lobby', round: 0, hand: [], players: [waitingPlayer('me', 'Me')] });
+  const { page, requests } = f;
+  assert.equal(await page.locator('.waiting-seat').count(), 6);
+  assert.equal(await page.locator('.waiting-seat-open').count(), 5);
+  assert.equal(await page.locator('.waiting-seat-self').innerText().then(s => s.includes('Me (you)')), true);
+  assert.equal(await page.locator('[data-action="start"]').isDisabled(), true);
+  assert.equal(await page.locator('.hand-panel').count(), 0);
+  await waitingScreenshot(page, 'waiting-host-desktop');
+  await page.getByRole('button', { name: 'Invite a friend to seat 2', exact: true }).click();
+  assert.equal(await page.locator('#invite-url').inputValue(), 'http://rummy.test/?room=ABCDEF123456');
+  await page.keyboard.press('Escape');
+  f.hold(); await page.locator('[data-action="addBot"]').click();
+  assert.equal(await page.locator('[data-action="addBot"]').isDisabled(), true);
+  f.release(); await page.getByRole('button', { name: 'Remove Practice bot', exact: true }).waitFor();
+  assert.equal(await page.locator('[data-action="start"]').isDisabled(), false);
+  await page.getByRole('button', { name: 'Remove Practice bot', exact: true }).click();
+  await page.waitForFunction(() => document.querySelectorAll('.waiting-seat-open').length === 5);
+  assert.equal(await page.locator('[data-action="start"]').isDisabled(), true);
+  await page.locator('[data-action="addBot"]').click();
+  await page.waitForFunction(() => !document.querySelector('[data-action="start"]').disabled);
+  await page.locator('[data-action="start"]').click();
+  await page.locator('.hand-panel').waitFor();
+  assert.equal(await page.locator('.waiting-table').count(), 0);
+  assert.equal(requests.filter(r => r.action === 'start').length, 1);
+  assert.deepEqual(f.errors, []);
+});
+test('waiting guest retains chat, handles host changes and cannot use host controls', async t => {
+  const f = await fixture(t, { width: 390, height: 844 }, false, { status: 'lobby', round: 0, hand: [], host: 'other', hasPassword: true, players: [waitingPlayer('me', 'Me'), waitingPlayer('other', '<script>Host</script>')] });
+  const { page, room } = f;
+  assert.equal(await page.locator('[data-action="start"], [data-action="addBot"], [data-remove]').count(), 0);
+  assert.equal(await page.locator('.waiting-host-status').innerText(), 'Waiting for the host');
+  assert.equal(await page.locator('.waiting-seat script').count(), 0);
+  assert.match(await page.locator('.waiting-invite').innerText(), /Share its password separately/);
+  await page.locator('#chat-input').fill('See you at the table');
+  room.version++; room.host = 'me';
+  await page.locator('[data-action="start"]').waitFor();
+  assert.equal(await page.locator('#chat-input').inputValue(), 'See you at the table');
+  assert.equal(await page.locator('#chat-input').evaluate(el => el === document.activeElement), true);
+  await page.locator('#chat-form button').click();
+  await page.locator('#messages .message').waitFor();
+  assert.equal(room.messages[0].text, 'See you at the table');
+  await waitingScreenshot(page, 'waiting-mobile');
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
+  f.setOffline(true); await page.evaluate(() => window.dispatchEvent(new Event('offline')));
+  assert.equal(await page.locator('[data-action="start"]').isDisabled(), true);
+  assert.equal(await page.locator('[data-action="addBot"]').isDisabled(), true);
+  assert.equal(await page.locator('#connection-banner').isVisible(), true);
+  assert.deepEqual(f.errors, []);
+});
+test('full waiting table keeps long names contained across viewports', async t => {
+  const f = await fixture(t, { width: 1024, height: 768 }, false, { status: 'lobby', round: 0, hand: [], players: [waitingPlayer('me', 'Me'), ...Array.from({ length: 5 }, (_, i) => waitingPlayer(`friend-${i}`, 'AveryLongNameWithoutSpaces', { bot: i === 4 }))] });
+  const { page } = f;
+  assert.equal(await page.locator('.waiting-seat-open').count(), 0);
+  assert.equal(await page.locator('[data-action="addBot"]').isDisabled(), true);
+  assert.equal(await page.locator('[data-action="start"]').isEnabled(), true);
+  for (const viewport of [{ width: 1920, height: 1080 }, { width: 1024, height: 768 }, { width: 768, height: 1024 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), viewport.width);
+    const overflow = await page.locator('.waiting-seat').evaluateAll(els => els.some(el => el.scrollWidth > el.clientWidth));
+    assert.equal(overflow, false);
+  }
+  await waitingScreenshot(page, 'waiting-full-mobile');
+  assert.deepEqual(f.errors, []);
 });
