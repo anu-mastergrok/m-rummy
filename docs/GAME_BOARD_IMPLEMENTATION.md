@@ -58,3 +58,16 @@ pending guards, and no automatic replay after an uncertain request. Returning
 from background or a network change requires a fresh snapshot before commands.
 Node syntax and three focused presentation tests pass. PHP is not installed in
 the editing environment; the repository workflow supplies PHP for full regression.
+
+### Milestone 3 validation
+
+Added native table panels for own cards, revealed result hands, table penalty
+standings (including ties), live table facts, local display preferences and chat.
+Chat drafts survive polling/failures; all text is escaped. A rejected declaration
+shows review/auto-group guidance without replaying the move. Native dialog labels,
+Escape handling and focus restoration are included. Added seven deterministic
+Chromium tests for privacy, pending guards, reconnect, chat, keyboard and four
+viewport sizes; CI installs the pinned browser test dependency and runs them.
+Local syntax/helper tests pass. Local Chromium cannot launch because this execution
+environment disallows its socket; browser and PHP regression results are checked
+through GitHub Actions.

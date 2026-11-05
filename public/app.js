@@ -5,6 +5,14 @@ const ranks = { 0: 'JK', 1: 'A', 11: 'J', 12: 'Q', 13: 'K' };
 let session, state, busy = false, polling = false, failures = 0, mode = 'create', groups = [], selected = new Set(), chatDraft = '', clockOffset = 0;
 let lastCode = '', confirmAction;
 let connection = 'connected';
+let openGamePanel = null, declarationError = '';
+let preferences = {};
+try { preferences = JSON.parse(localStorage.getItem('mr-preferences') || '{}') || {}; if (typeof preferences !== 'object' || Array.isArray(preferences)) preferences = {}; } catch { /* Optional preferences. */ }
+function applyPreferences() {
+  document.documentElement.classList.toggle('roomy-cards', preferences.roomyCards === true);
+  document.documentElement.classList.toggle('quiet-motion', preferences.quietMotion === true);
+}
+applyPreferences();
 const groupKey = room => `mr-groups-${room.code}-${room.round}`;
 const commandSelector = '[data-draw], [data-remove], [data-action="start"], [data-action="addBot"], [data-action="drop"], [data-action="discard"], [data-action="declare"], [data-action="arrange"], [data-action="leave"], #chat-form button';
 let authMode = 'register', account = null, profileOffset = 0, authBusy = false;
@@ -44,10 +52,11 @@ function accept(next) {
   selected = new Set([...selected].filter(id => next.hand.some(c => c.id === id)));
   groups = reconcileGroups(groups, next.hand);
   if (changed) renderRoom();
-  updateClock(); syncControls();
+  updateClock(); syncControls(); renderGamePanel();
 }
 function landing() {
   state = null; selected.clear(); groups = [];
+  document.querySelector('#game-dialog')?.close();
   app.className = 'landing';
   const invite = new URLSearchParams(location.search).get('room') || '';
   if (invite) mode = 'join';
@@ -105,6 +114,7 @@ function renderRoom() {
   const loose = state.hand.filter(c => !inGroups.has(c.id));
   const groupView = (ids, title, i) => `<div class="hand-group"><div class="group-heading"><span>${esc(title)}</span>${i !== undefined ? `<button class="ungroup" data-ungroup="${i}" aria-label="Ungroup ${esc(title)}">×</button>` : ''}</div><div class="cards">${ids.map(id => card(state.hand.find(c => c.id === id), true)).join('')}</div></div>`;
   app.innerHTML = `<div class="room-heading"><div><div class="eyebrow">YOUR PRIVATE CLUB <span class="connection" id="connection">● Connected</span></div><h1>The friends’ table<span class="round-badge">${state.round ? `Round ${state.round}` : 'Waiting room'}</span></h1></div><div class="button-row"><button class="button secondary small" data-action="invite">Invite friends <span>↗</span></button><button class="icon-button leave-button" data-action="leave" aria-label="Leave table" title="Leave table">⇥</button></div></div>
+  <nav class="board-toolbar" aria-label="Table tools"><button class="button secondary small" data-panel="chat">Chat</button><button class="button secondary small" data-panel="hand" ${!state.hand.length ? 'disabled' : ''}>View cards</button><button class="button secondary small" data-panel="standings">Standings</button><button class="button secondary small" data-panel="information">Table info</button><button class="button secondary small" data-panel="settings">Settings</button></nav>
   <div id="connection-banner" class="connection-banner" role="status" hidden></div><div id="command-status" class="sr-only" role="status"></div>
   <div class="game-layout"><section class="table-column"><div class="felt-table"><div class="felt-top"><span>13-CARD INDIAN RUMMY</span><span class="room-code">ROOM ${state.code} ${state.hasPassword ? '· LOCKED' : ''}</span></div><div class="seats">${state.players.filter(p => p.id !== state.me).map(p => `<div class="seat ${playing && state.turn === p.id ? 'active' : ''} ${p.dropped ? 'dropped' : ''}"><div class="avatar">${p.bot ? '✦' : esc(p.name.slice(0, 1).toUpperCase())}</div><strong>${esc(p.name)}</strong><span>${p.bot ? 'Practice bot' : p.id === state.host ? 'Table host' : 'Friend'}${p.dropped ? ' · Dropped' : playing ? ` · ${p.count} cards` : ''}</span>${playing && !p.dropped ? '<div class="mini-hand">▥ ▥ ▥ ▥ ▥</div>' : ''}${host && isLobby && p.bot ? `<button class="remove-bot" data-remove="${p.id}">Remove</button>` : ''}</div>`).join('')}${state.players.length < 6 && isLobby ? `<button class="seat empty-seat" data-action="invite"><span class="avatar">+</span><strong>A seat for a friend</strong><span>Share your invite link</span></button>` : ''}</div>
   ${state.status === 'lobby' ? `<div class="lobby-center"><span class="table-club">♣</span><h2>Great company.<br>One good game.</h2><p>${host ? 'Invite a friend or add a practice bot to get started.' : 'Make yourself comfortable. Your host will deal shortly.'}</p><div class="button-row">${host ? `<button class="button cream" data-action="start" ${state.players.length < 2 ? 'disabled' : ''}>Deal the first round <span>→</span></button><button class="button felt-outline" data-action="addBot" ${state.players.length >= 6 ? 'disabled' : ''}>+ Practice bot</button>` : '<span class="waiting-label">Waiting for the host to deal…</span>'}</div></div>` : `<div class="deck-area"><div class="pile"><span class="pile-label">CLOSED DECK</span><button class="card card-back" data-draw="stock" ${!myTurn || state.phase !== 'draw' ? 'disabled' : ''} aria-label="Draw from closed deck"><span>♣</span><small>M RUMMY</small></button><span class="pile-caption">${state.stockCount} cards</span></div><div class="pile"><span class="pile-label">OPEN DECK</span><button class="open-pile" data-draw="discard" ${!myTurn || state.phase !== 'draw' || !state.topDiscard || [0, state.wildRank].includes(state.topDiscard.rank) ? 'disabled' : ''} aria-label="Draw from open deck">${state.topDiscard ? card(state.topDiscard) : '<span class="empty-card">Empty</span>'}</button><span class="pile-caption">${state.topDiscard && [0, state.wildRank].includes(state.topDiscard.rank) ? 'Joker · cannot pick' : 'Take the top card'}</span></div><div class="wild-indicator"><span class="pile-label">WILD JOKER</span>${card(state.indicator)}<span class="pile-caption">All ${ranks[state.wildRank] || state.wildRank}s are wild</span></div></div>`}
@@ -120,6 +130,45 @@ function updateClock() {
   const el = document.querySelector('#turn-clock'); if (!el || !state) return;
   const seconds = remainingSeconds(state.deadline, clockOffset);
   el.textContent = `${seconds}s`; el.classList.toggle('urgent', seconds <= 15);
+}
+function showGamePanel(panel) {
+  if (!state) return;
+  openGamePanel = panel; document.querySelector('#game-panel-content').innerHTML = ''; renderGamePanel();
+  const dialog = document.querySelector('#game-dialog');
+  if (!dialog.open) dialog.showModal();
+}
+function renderGamePanel() {
+  if (!openGamePanel || !state) return;
+  const titles = { chat: 'Table talk', hand: 'Your cards', standings: 'Table standings', information: 'About this table', settings: 'Your display settings', declaration: 'Review your declaration' };
+  const content = document.querySelector('#game-panel-content');
+  if (openGamePanel === 'settings' && content.querySelector('[data-preference]')) return;
+  const focused = document.activeElement?.id;
+  const cursor = document.activeElement?.selectionStart;
+  const oldMessages = content.querySelector('.messages');
+  const scroll = oldMessages?.scrollTop || 0;
+  const nearBottom = !oldMessages || oldMessages.scrollHeight - oldMessages.clientHeight - scroll < 32;
+  document.querySelector('#game-panel-title').textContent = titles[openGamePanel];
+  if (openGamePanel === 'chat') {
+    content.innerHTML = `<div class="messages" aria-label="Table message history">${state.messages.length ? state.messages.map(m => `<div class="message"><span>${esc(m.name)} <time>${new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></span><p>${esc(m.text)}</p></div>`).join('') : '<p>No messages yet. Say hello to your table.</p>'}</div><form class="chat-form" id="dialog-chat-form"><label class="sr-only" for="dialog-chat-input">Message your table</label><input id="dialog-chat-input" maxlength="240" required autocomplete="off" placeholder="Say something…" value="${esc(chatDraft)}"><button type="submit" aria-label="Send message" ${busy || connection !== 'connected' ? 'disabled' : ''}>↑</button></form><p id="dialog-chat-status" role="status">${connection !== 'connected' ? 'Reconnecting. Your draft is kept until you can send.' : busy ? 'Sending your action…' : 'Only players at this table can read these messages.'}</p>`;
+    const messages = content.querySelector('.messages');
+    messages.scrollTop = nearBottom ? messages.scrollHeight : scroll;
+  } else if (openGamePanel === 'hand') {
+    const inGroups = new Set(groups.flatMap(g => g.ids));
+    const visibleGroups = [...groups, { title: 'Ungrouped', ids: state.hand.filter(c => !inGroups.has(c.id)).map(c => c.id) }];
+    content.innerHTML = `<p>${state.hand.length} cards · Only your own hand is shown here. Close this panel to arrange or play.</p><div class="inspect-hand">${visibleGroups.filter(g => g.ids.length).map(g => `<section><h3>${esc(g.title || 'Group')}</h3><div class="cards">${g.ids.map(id => card(state.hand.find(c => c.id === id))).join('')}</div></section>`).join('')}</div>`;
+  } else if (openGamePanel === 'standings') {
+    content.innerHTML = `<p>Current table only. Lower cumulative penalty points rank higher. Tied scores share a place. Profile play points are separate.</p><div class="score-table-wrap"><table class="score-table"><caption class="sr-only">Cumulative table penalties</caption><thead><tr><th scope="col">Place / Player</th><th scope="col">Penalty total ↓</th></tr></thead><tbody>${tableStandings(state.players).map(p => `<tr><td>${p.place}. ${esc(p.name)}${p.bot ? ' · Bot' : ''}${p.id === state.me ? ' · You' : ''}</td><td>${number(p.total)}</td></tr>`).join('')}</tbody></table></div>${state.status === 'finished' ? `<h3>Revealed round hands</h3><div class="inspect-hand">${state.result.scores.map(p => `<section><h3>${esc(p.name)}</h3><div class="cards">${p.hand.map(c => card(c)).join('')}</div></section>`).join('')}</div>` : ''}`;
+  } else if (openGamePanel === 'information') {
+    content.innerHTML = `<dl class="table-facts"><dt>Room</dt><dd>${esc(state.code)}</dd><dt>Game</dt><dd>13-card Indian rummy · Two packs</dd><dt>Players</dt><dd>${state.players.length} / 6</dd><dt>Round</dt><dd>${state.round || 'Not started'}</dd><dt>Status</dt><dd>${esc(state.status)}</dd><dt>Privacy</dt><dd>Invite only${state.hasPassword ? ' · Password protected' : ''}</dd><dt>Stakes</dt><dd>Free play · No money involved</dd><dt>Human turns</dt><dd>60 seconds · Server timed</dd></dl><p>Form at least two sequences including one pure sequence, and valid groups throughout. Invalid declarations leave your hand and turn open. First drop: 20 penalty points; later drop: 40. Round penalty is capped at 80.</p>`;
+  } else if (openGamePanel === 'settings') {
+    content.innerHTML = `<p>Display preferences are saved on this browser.</p><label class="preference"><input type="checkbox" data-preference="roomyCards" ${preferences.roomyCards ? 'checked' : ''}><span>Spread out hand cards<small>Less overlap; scroll sideways to see the full hand.</small></span></label><label class="preference"><input type="checkbox" data-preference="quietMotion" ${preferences.quietMotion ? 'checked' : ''}><span>Reduce motion<small>Your device’s reduced-motion preference is also respected.</small></span></label>`;
+  } else if (openGamePanel === 'declaration') {
+    content.innerHTML = `<p class="declaration-feedback">${esc(declarationError)}</p><p>Check for two sequences, at least one pure, and valid groups covering your other 13 cards. No penalty was applied to the rejected declaration. The server timer continues.</p><div class="button-row"><button class="button primary" data-close="game-dialog">Review my hand</button><button class="button secondary" data-panel-action="arrange" ${busy || connection !== 'connected' ? 'disabled' : ''}>Auto-group</button></div>`;
+  }
+  if (focused === 'dialog-chat-input') {
+    const input = content.querySelector('#dialog-chat-input');
+    input?.focus(); input?.setSelectionRange(cursor, cursor);
+  }
 }
 function syncControls(fresh = false) {
   if (!state) return;
@@ -143,6 +192,12 @@ function syncControls(fresh = false) {
     banner.hidden = connection === 'connected';
     banner.textContent = connection === 'syncing' ? 'Refreshing your hand and turn from the server…' : 'Connection interrupted. Reconnecting automatically. Game actions resume after your table is refreshed.';
   }
+  const arrange = document.querySelector('[data-panel-action="arrange"]');
+  if (arrange) arrange.disabled = blocked;
+  const dialogSend = document.querySelector('#dialog-chat-form button');
+  if (dialogSend) dialogSend.disabled = blocked;
+  const dialogStatus = document.querySelector('#dialog-chat-status');
+  if (dialogStatus) dialogStatus.textContent = connection !== 'connected' ? 'Reconnecting. Your draft is kept until you can send.' : busy ? 'Sending your action…' : 'Only players at this table can read these messages.';
   const status = document.querySelector('#command-status');
   if (status) status.textContent = busy ? 'Sending your action…' : '';
 }
@@ -166,6 +221,7 @@ async function action(actionName, extra = {}) {
     return true;
   } catch (e) {
     if (!e.status || e.status >= 500) setConnection('reconnecting');
+    if (actionName === 'declare' && e.status === 400) { declarationError = e.message; showGamePanel('declaration'); }
     toast(e.message, true); return false;
   }
   finally { busy = false; syncControls(); }
@@ -186,6 +242,7 @@ async function poll() {
 }
 app.addEventListener('click', async event => {
   const target = event.target.closest('button'); if (!target || target.disabled) return;
+  if (target.dataset.panel) { showGamePanel(target.dataset.panel); return; }
   if (target.dataset.authMode) { if (authBusy) return; authMode = target.dataset.authMode; renderAuth(); return; }
   if (target.dataset.mode) { mode = target.dataset.mode; landing(); return; }
   if (target.dataset.card) {
@@ -215,12 +272,42 @@ app.addEventListener('click', async event => {
       if (state.status === 'playing') toast('Leave after the round ends. You can drop to sit this round out.', true);
       else confirm('Leave the table?', 'Your seat will be released. If you’re the host, another friend takes over.', () => action('leave'));
       break;
-    case 'declare': confirm('Ready to show your hand?', 'Your selected card is the final discard. We’ll check the other 13 for two sequences, one pure, and valid groups throughout.', () => action('declare', { cardId: [...selected][0] })); break;
+    case 'declare': {
+      const cardId = [...selected][0];
+      confirm('Ready to show your hand?', 'Your selected card is the final discard. We’ll check the other 13 for two sequences, one pure, and valid groups throughout.', () => action('declare', { cardId })); break;
+    }
     case 'discard': await action('discard', { cardId: [...selected][0] }); break;
     case 'start': case 'addBot': case 'arrange': await action(target.dataset.action); break;
   }
 });
-app.addEventListener('input', event => { if (event.target.id === 'chat-input') chatDraft = event.target.value; });
+document.addEventListener('input', event => {
+  if (['chat-input', 'dialog-chat-input'].includes(event.target.id)) {
+    chatDraft = event.target.value;
+    for (const input of document.querySelectorAll('#chat-input, #dialog-chat-input')) if (input !== event.target) input.value = chatDraft;
+  }
+});
+document.querySelector('#game-dialog').addEventListener('close', () => { openGamePanel = null; });
+document.querySelector('#game-dialog').addEventListener('change', event => {
+  const key = event.target.dataset.preference;
+  if (!['roomyCards', 'quietMotion'].includes(key)) return;
+  preferences[key] = event.target.checked; applyPreferences();
+  try { localStorage.setItem('mr-preferences', JSON.stringify(preferences)); } catch { toast('Applied for this visit. Browser storage is unavailable.'); }
+});
+document.querySelector('#game-dialog').addEventListener('click', event => {
+  if (event.target.closest('[data-panel-action="arrange"]') && !busy && connection === 'connected') { document.querySelector('#game-dialog').close(); action('arrange'); }
+});
+document.querySelector('#game-dialog').addEventListener('submit', async event => {
+  if (event.target.id !== 'dialog-chat-form') return;
+  event.preventDefault(); await sendChat('dialog-chat-input');
+});
+async function sendChat(inputId) {
+  if (!chatDraft.trim() || busy || connection !== 'connected') return;
+  const text = chatDraft; chatDraft = '';
+  const sent = await action('chat', { text });
+  if (!sent && !chatDraft) chatDraft = text;
+  for (const input of document.querySelectorAll('#chat-input, #dialog-chat-input')) input.value = chatDraft;
+  document.getElementById(inputId)?.focus();
+}
 app.addEventListener('submit', async event => {
   event.preventDefault();
   if (event.target.id === 'auth-form') {
@@ -242,10 +329,7 @@ app.addEventListener('submit', async event => {
     return;
   }
   if (event.target.id === 'chat-form') {
-    if (!chatDraft.trim() || busy) return;
-    const text = chatDraft; chatDraft = ''; const sent = await action('chat', { text });
-    if (!sent) chatDraft = text;
-    const input = document.querySelector('#chat-input'); if (input) { input.value = chatDraft; input.focus(); }
+    await sendChat('chat-input');
     return;
   }
   if (event.target.id !== 'entry-form' || busy) return;
@@ -274,6 +358,16 @@ document.querySelector('#profile-dialog').addEventListener('click', async event 
     } catch (e) { toast(e.message, true); target.disabled = false; }
     finally { busy = false; }
   }
+});
+document.querySelectorAll('dialog').forEach(dialog => {
+  const title = dialog.querySelector('h2');
+  if (title) { title.id ||= `${dialog.id}-title`; dialog.setAttribute('aria-labelledby', title.id); }
+  let opener;
+  dialog.addEventListener('close', () => {
+    if (opener?.isConnected) opener.focus();
+    else if (state) document.querySelector('[data-panel="' + (opener?.dataset.panel || 'hand') + '"]')?.focus();
+  });
+  dialog.addEventListener('beforetoggle', event => { if (event.newState === 'open') opener = document.activeElement; });
 });
 document.addEventListener('click', event => { const button = event.target.closest('[data-close]'); if (button) document.getElementById(button.dataset.close).close(); });
 document.querySelector('#confirm-yes').addEventListener('click', () => { document.querySelector('#confirm-dialog').close(); confirmAction?.(); });
