@@ -300,3 +300,30 @@ test('local network loss marks self reconnecting and treats remote presence as u
   await page.locator('[data-presence-player="other"][data-presence="online"]').waitFor();
   assert.equal(await page.locator('[data-presence-player="me"]').innerText(), 'Connected'); assert.deepEqual(f.errors, []);
 });
+
+ test('Figma splash stays visible during startup and clears after session recovery', async t => {
+const browser = await chromium.launch({ ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}) });
+t.after(() => browser.close());
+const page = await browser.newPage({viewport:{width:1920,height:1080}});
+let release;const gate=new Promise(r=>release=r);
+await page.route('http://rummy.test/**',async route=>{
+const path=new URL(route.request().url()).pathname;
+if(path==='/api/session'){await gate;return route.fulfill({json:{csrf:'test',rooms:[],account:null}});}
+if(path.startsWith('/api/'))return route.fulfill({json:{tables:[],tableLimit:3}});
+const file=path==='/'?'index.html':path.slice(1);
+try{return route.fulfill({body:await readFile('public/'+file),contentType:file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':file.endsWith('.png')?'image/png':'text/html'});}catch{return route.fulfill({status:404});}
+});
+await page.goto('http://rummy.test/',{waitUntil:'domcontentloaded'});
+await page.locator('.splash-art').evaluate(img=>img.decode());
+assert.equal(await page.locator('.site-header').isVisible(),false);
+assert.equal(await page.locator('.splash-art').evaluate(el=>el.getBoundingClientRect().width),640);
+
+await page.setViewportSize({width:390,height:844});
+assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),390);
+
+release();await page.locator('.landing').waitFor();
+assert.equal(await page.locator('body').getAttribute('class'),'');
+assert.equal(await page.locator('#app').getAttribute('aria-busy'),null);
+
+
+});
