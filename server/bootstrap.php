@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/accounts.php';
+require_once __DIR__ . '/presence.php';
 
 final class RummyApiError extends RuntimeException {
     public function __construct(string $message, public int $status = 400, public ?array $state = null) { parent::__construct($message); }
@@ -53,7 +54,11 @@ function rummy_rotate_session(array &$store, string $oldToken, string $id, bool 
     return rummy_session_view($store, $session);
 }
 function rummy_room_view(array $store, array $room, string $id): array {
-    return array_merge(rummy_public($room, $id), ['account' => rummy_profile($store, $id)]);
+    $view = rummy_public($room, $id);
+    $presence = rummy_player_presence($store, $view['players'], rummy_now());
+    foreach ($view['players'] as &$player) $player['presence'] = $presence[$player['id']];
+    unset($player);
+    return array_merge($view, ['account' => rummy_profile($store, $id)]);
 }
 function rummy_handle(array &$store, array $config, string $route, string $method, array $input): array {
     $now = rummy_now(); $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
@@ -110,6 +115,8 @@ function rummy_handle(array &$store, array $config, string $route, string $metho
     if ($route === 'tables' && $method === 'GET') {
         $selected = $_GET['code'] ?? '';
         rummy_require(is_string($selected) && ($selected === '' || preg_match('/^[A-Fa-f0-9]{12}$/D', $selected)), 'Invalid selected table.');
+        $presence = rummy_presence_input($_GET);
+        if ($presence !== null) rummy_record_presence($store['sessions'][$token], $presence, $now);
         return rummy_tables_view($store, $id, strtoupper($selected));
     }
     if (in_array($route, ['create', 'join'], true) && empty($session['accountId'])) throw new RummyApiError('Create an account or sign in to play.', 401);
