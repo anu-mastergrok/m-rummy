@@ -454,6 +454,7 @@ for (const [width, height] of [[390, 844], [768, 1024], [1024, 768], [1920, 1080
 for (const [width, height] of [[390, 844], [1920, 1080]]) {
   test(`connection notice preserves the hand and retries one snapshot at ${width}px`, async t => {
     const f = await fixture(t, { width, height }); const { page, room } = f;
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.locator('[data-card="card-0"]').click();
     await page.locator('#chat-input').fill('Unsent message');
     f.setOffline(true); await page.evaluate(() => window.dispatchEvent(new Event('offline')));
@@ -466,13 +467,14 @@ for (const [width, height] of [[390, 844], [1920, 1080]]) {
     assert.equal(await page.locator('#chat-input').inputValue(), 'Unsent message');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     for (const [name, size] of [['connection-lost', 86], ['connection-loading', 56]]) {
-      const box = await page.locator(`#connection-banner img[src$="${name}.svg"]`).boundingBox();
-      assert.equal(box.width, size); assert.equal(box.height, size);
+      const dimensions = await page.locator(`#connection-banner img[src$="${name}.svg"]`).evaluate(el => ({ width: el.offsetWidth, height: el.offsetHeight }));
+      assert.equal(dimensions.width, size); assert.equal(dimensions.height, size);
     }
     if (process.env.UI_SCREENSHOT_DIR) {
       await mkdir(process.env.UI_SCREENSHOT_DIR, { recursive: true });
       await page.screenshot({ path: resolve(process.env.UI_SCREENSHOT_DIR, `connection-lost-${width}.png`), fullPage: true });
     }
+    assert.equal(await page.locator('.connection-progress img').evaluate(el => getComputedStyle(el).animationName), 'none');
     const started = f.holdNextPoll(); f.setOffline(false);
     await page.evaluate(() => { const retry = document.querySelector('#connection-retry'); retry.focus(); retry.click(); retry.click(); retry.click(); });
     await started;
