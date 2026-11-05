@@ -8,5 +8,5 @@ if (preg_match('#^/api/([a-z]+)$#', $path, $matches)) {
     $_GET['route'] = $matches[1]; require __DIR__ . '/api.php'; return true;
 }
 if ($path === '/') { readfile(__DIR__ . '/index.html'); return true; }
-if (in_array($path, ['/index.html', '/app.js', '/style.css', '/favicon.svg', '/manifest.webmanifest', '/sw.js', '/offline.html', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png'], true)) return false;
+if (in_array($path, ['/index.html', '/app.js', '/board-state.js', '/tutorial.js', '/style.css', '/favicon.svg', '/manifest.webmanifest', '/sw.js', '/offline.html', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png'], true)) return false;
 http_response_code(404); header('Content-Type: application/json'); echo '{"error":"Not found."}';
