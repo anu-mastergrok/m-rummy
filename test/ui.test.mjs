@@ -864,6 +864,7 @@ for (const [width, height] of [[320, 740], [390, 844], [768, 1024], [1920, 1080]
     assert.equal(await page.locator('#game-dialog .joker').count(), 1);
     assert.equal(await page.locator('#game-dialog .wild-badge').count(), 1);
     assert.match(await page.locator('.hand-view-summary').innerText(), /14 cards/);
+    assert.doesNotMatch(await page.locator('#game-panel-title').evaluate(el => getComputedStyle(el).fontFamily), /Georgia/);
     assert.match(await page.locator('#hand-view-note').innerText(), /timer keeps running/);
     assert.equal(await page.locator('#game-dialog').evaluate(el => el.scrollWidth <= el.clientWidth), true);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
@@ -878,6 +879,8 @@ for (const [width, height] of [[320, 740], [390, 844], [768, 1024], [1920, 1080]
       await mkdir(process.env.UI_SCREENSHOT_DIR, { recursive: true });
       await page.screenshot({ path: resolve(process.env.UI_SCREENSHOT_DIR, `view-cards-${width}.png`), fullPage: true });
     }
+    await page.locator('#hand-view-back').scrollIntoViewIfNeeded();
+    if (process.env.UI_SCREENSHOT_DIR && width <= 390) await page.screenshot({ path: resolve(process.env.UI_SCREENSHOT_DIR, `view-cards-bottom-${width}.png`), fullPage: true });
     await page.locator('#hand-view-back').click();
     assert.equal(await page.locator('#game-dialog').evaluate(d => d.open), false);
     assert.equal(f.requests.length, 0); assert.deepEqual(f.errors, []);

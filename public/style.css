@@ -385,7 +385,7 @@ button.settings-option:disabled .settings-option-icon{opacity:.55}
 /* Local Figma 11:74211 / View Modal 11:74367: green hand inspection surface. */
 #game-dialog[data-panel=hand]{width:min(760px,calc(100vw - 32px));max-width:none;background:#117954;color:#f2f5f2;border:2px solid #85d0b6;border-radius:18px;padding:24px;scrollbar-color:#b5aeda #0d6345}
 #game-dialog[data-panel=hand] .dialog-head{align-items:center;gap:16px;margin-bottom:18px}
-#game-dialog[data-panel=hand] .dialog-head h2{font:600 24px var(--sans);color:#fff;margin:0}
+#game-dialog[data-panel=hand] #game-panel-title{font:600 24px var(--sans);color:#fff;margin:0}
 #game-dialog[data-panel=hand] .dialog-head .eyebrow{color:#d4f0e6}
 #game-dialog[data-panel=hand] .dialog-head [data-close]{color:#fff;background:#0a563c;border:1px solid #85d0b6;border-radius:50%;width:44px;height:44px;flex:0 0 44px}
 .hand-view-summary{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:11px;color:#e1f4ea;letter-spacing:.3px}
@@ -403,4 +403,4 @@ button.settings-option:disabled .settings-option-icon{opacity:.55}
 .hand-view-footer>span{font-size:12px;line-height:1.6;color:#e1f4ea}
 .hand-view-footer .button{background:#f2f5f2;color:#083827;min-height:44px;border:1px solid #fff}
 #game-dialog[data-panel=hand] :focus-visible{outline-color:#f5e18f;outline-offset:3px}
-@media(max-width:600px){#game-dialog[data-panel=hand]{padding:18px 14px;width:calc(100vw - 24px);border-radius:14px}#game-dialog[data-panel=hand] .dialog-head h2{font-size:21px}.hand-view-groups section{padding:12px}.hand-view-groups .cards{grid-template-columns:repeat(auto-fit,57px);gap:8px}.hand-view-groups .card{width:57px;height:82px}.hand-view-groups .card-corner{font-size:13px}.hand-view-groups .card-suit{font-size:26px}.hand-view-footer .button{width:100%}}
+@media(max-width:600px){#game-dialog[data-panel=hand]{padding:18px 14px;width:calc(100vw - 24px);border-radius:14px}#game-dialog[data-panel=hand] #game-panel-title{font-size:21px}.hand-view-groups section{padding:12px}.hand-view-groups .cards{grid-template-columns:repeat(auto-fit,57px);gap:8px}.hand-view-groups .card{width:57px;height:82px}.hand-view-groups .card-corner{font-size:13px}.hand-view-groups .card-suit{font-size:26px}.hand-view-footer .button{width:100%}}
